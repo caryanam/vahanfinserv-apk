@@ -3925,9 +3925,9 @@ const formatINR = amount => {
 const normalizeDbStatus = user => {
   const raw = String(
     user?.status ||
-      user?.paymentStatus ||
-      user?.paymentVerificationStatus ||
-      '',
+    user?.paymentStatus ||
+    user?.paymentVerificationStatus ||
+    '',
   ).toUpperCase();
 
   if (
@@ -4211,18 +4211,18 @@ const AdminPaymentsScreen = ({ navigation }) => {
           return db - da;
         });
 
-     
-        
-        JSON.stringify(
-          finalList.map(item => ({
-            userId: item.userId,
-            name: item.fullName,
-            email: item.email,
-            mobile: item.mobileNumber,
-            documentsCount: item.documentsCount,
-            status: item.displayStatus,
-            message: item.message,
-          }),
+
+
+      JSON.stringify(
+        finalList.map(item => ({
+          userId: item.userId,
+          name: item.fullName,
+          email: item.email,
+          mobile: item.mobileNumber,
+          documentsCount: item.documentsCount,
+          status: item.displayStatus,
+          message: item.message,
+        }),
         ),
       );
 
@@ -4297,10 +4297,10 @@ const AdminPaymentsScreen = ({ navigation }) => {
         prev.map(payment =>
           String(getUserId(payment)) === String(userId)
             ? {
-                ...payment,
-                displayStatus: PAYMENT_STATUS.PAYMENT_APPROVED,
-                message: 'Payment approved successfully.',
-              }
+              ...payment,
+              displayStatus: PAYMENT_STATUS.PAYMENT_APPROVED,
+              message: 'Payment approved successfully.',
+            }
             : payment,
         ),
       );

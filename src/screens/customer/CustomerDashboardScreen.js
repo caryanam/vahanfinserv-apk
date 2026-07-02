@@ -876,7 +876,7 @@
 
 // export default CustomerDashboardScreen;
 // src/screens/customer/CustomerDashboardScreen.js
-import React, { useCallback, useEffect, useState } from 'react';
+import React, {useCallback, useEffect, useState} from 'react';
 import {
   View,
   Text,
@@ -891,8 +891,8 @@ import {
   Alert,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getUserDocuments } from '../../services/documentService';
-import { getUserProfile } from '../../services/customerService';
+import {getUserDocuments} from '../../services/documentService';
+import {getUserProfile} from '../../services/customerService';
 import {
   READY2DRIVE_TOTAL_AMOUNT,
   READY2DRIVE_FEE_LABEL,
@@ -903,32 +903,34 @@ import {
 } from '../../constants/payment';
 import Sidebar from '../../components/common/Sidebar';
 import StatCard from '../../components/common/StatCard';
-import { COLORS, SPACING, RADIUS } from '../../constants/theme';
+import {COLORS, SPACING, RADIUS} from '../../constants/theme';
 import Toast from 'react-native-toast-message';
 
 const CUSTOMER_MENU = [
-  { name: 'Dashboard', emoji: '🏠' },
-  { name: 'Documents', emoji: '📄' },
-  { name: 'Status', emoji: '📋' },
-  { name: 'Settings', emoji: '⚙️' },
+  {name: 'Dashboard', emoji: '🏠'},
+  {name: 'Documents', emoji: '📄'},
+  {name: 'Status', emoji: '📋'},
+  {name: 'Settings', emoji: '⚙️'},
 ];
 
 const DOCUMENT_LABELS = {
-  AADHAAR: 'Aadhaar',
+  AADHAAR_1: 'Aadhaar Front Side',
+  AADHAAR_2: 'Aadhaar Back Side',
   PAN: 'PAN',
   PASSPORT: 'Passport',
   VOTER_ID: 'Voter ID',
   DRIVING_LICENSE: 'Driving License',
   LIGHT_BILL: 'Light Bill',
   RENTAL_AGREEMENT: 'Rental Agreement',
-  SALARY_SLIP: 'Salary Slip',
+  SALARY_SLIP_1: 'Salary Slip Month 1',
+  SALARY_SLIP_2: 'Salary Slip Month 2',
+  SALARY_SLIP_3: 'Salary Slip Month 3',
   BANK_STATEMENT: 'Bank Statement',
   ITR_RETURN: 'ITR Return',
   APPOINTMENT_LETTER: 'Appointment Letter',
-  RC: 'RC',
+  RC_1: 'RC Front Side',
+  RC_2: 'RC Back Side',
   INSURANCE: 'Insurance',
-  VEHICLE_INVOICE: 'Vehicle Invoice',
-  VEHICLE_PHOTO: 'Vehicle Photo',
   ODOMETER_READING: 'Odometer Reading',
   CHASSIS_NUMBER: 'Chassis Number',
   CAR_FRONT_SIDE_PHOTO: 'Car Front Side Photo',
@@ -937,25 +939,25 @@ const DOCUMENT_LABELS = {
 };
 
 const STATUS_COLORS = {
-  PENDING: { bg: '#FEF3C7', text: '#92400E' },
-  APPROVED: { bg: '#D1FAE5', text: '#065F46' },
-  VERIFIED: { bg: '#DBEAFE', text: '#1E40AF' },
-  REJECTED: { bg: '#FEE2E2', text: '#991B1B' },
+  PENDING: {bg: '#FEF3C7', text: '#92400E'},
+  APPROVED: {bg: '#D1FAE5', text: '#065F46'},
+  VERIFIED: {bg: '#DBEAFE', text: '#1E40AF'},
+  REJECTED: {bg: '#FEE2E2', text: '#991B1B'},
 };
 
-const StatusBadge = ({ status }) => {
-  const colors = STATUS_COLORS[status] || { bg: '#F3F4F6', text: '#374151' };
+const StatusBadge = ({status}) => {
+  const colors = STATUS_COLORS[status] || {bg: '#F3F4F6', text: '#374151'};
 
   return (
-    <View style={[styles.badge, { backgroundColor: colors.bg }]}>
-      <Text style={[styles.badgeText, { color: colors.text }]}>
+    <View style={[styles.badge, {backgroundColor: colors.bg}]}>
+      <Text style={[styles.badgeText, {color: colors.text}]}>
         {status || 'PENDING'}
       </Text>
     </View>
   );
 };
 
-const CustomerDashboardScreen = ({ navigation }) => {
+const CustomerDashboardScreen = ({navigation}) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeMenu, setActiveMenu] = useState('Dashboard');
   const [loading, setLoading] = useState(true);
@@ -970,46 +972,78 @@ const CustomerDashboardScreen = ({ navigation }) => {
     rejected: 0,
   });
 
-  const loadData = useCallback(async (userId) => {
-    if (!userId) {
-      setLoading(false);
-      setRefreshing(false);
-      return;
-    }
-
-    try {
-      const [profileRes, docsRes] = await Promise.allSettled([
-        getUserProfile(userId).catch(() => null),
-        getUserDocuments(userId).catch(() => ({ data: { data: [] } })),
-      ]);
-
-      if (profileRes.status === 'fulfilled' && profileRes.value) {
-        setProfile(profileRes.value?.data?.data || profileRes.value?.data || profileRes.value);
+  const loadData = useCallback(
+    async userId => {
+      if (!userId) {
+        setLoading(false);
+        setRefreshing(false);
+        return;
       }
 
-      const docList =
-        docsRes.status === 'fulfilled'
-          ? docsRes.value?.data?.data || docsRes.value?.data || []
-          : [];
+      try {
+        const [profileRes, docsRes] = await Promise.allSettled([
+          getUserProfile(userId).catch(() => null),
+          getUserDocuments(userId).catch(() => ({data: {data: []}})),
+        ]);
 
-      const docs = Array.isArray(docList) ? docList : [];
-      setDocuments(docs);
+        if (profileRes.status === 'fulfilled' && profileRes.value) {
+          const loadedProfile =
+            profileRes.value?.data?.data ||
+            profileRes.value?.data ||
+            profileRes.value;
+          setProfile(loadedProfile);
 
-      setDocStats({
-        total: docs.length,
-        pending: docs.filter((d) => d.status === 'PENDING').length,
-        approved: docs.filter(
-          (d) => d.status === 'APPROVED' || d.status === 'VERIFIED',
-        ).length,
-        rejected: docs.filter((d) => d.status === 'REJECTED').length,
-      });
-    } catch (err) {
-      Toast.show({ type: 'error', text1: 'Failed to load data' });
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
+          const regType = String(loadedProfile?.registrationType || '')
+            .toUpperCase()
+            .trim();
+          const isPaid =
+            loadedProfile?.paymentDone === true ||
+            String(loadedProfile?.paymentStatus || '')
+              .toUpperCase()
+              .trim() === 'SUCCESS';
+
+          if (regType === 'INDIVIDUAL' && !isPaid) {
+            console.log(
+              'INDIVIDUAL UNPAID USER AT DASHBOARD, REDIRECTING TO PAYMENT...',
+            );
+            navigation.reset({
+              index: 0,
+              routes: [
+                {
+                  name: 'Payment',
+                  params: {userId, applicationNumber: `USER-${userId}`},
+                },
+              ],
+            });
+            return;
+          }
+        }
+
+        const docList =
+          docsRes.status === 'fulfilled'
+            ? docsRes.value?.data?.data || docsRes.value?.data || []
+            : [];
+
+        const docs = Array.isArray(docList) ? docList : [];
+        setDocuments(docs);
+
+        setDocStats({
+          total: docs.length,
+          pending: docs.filter(d => d.status === 'PENDING').length,
+          approved: docs.filter(
+            d => d.status === 'APPROVED' || d.status === 'VERIFIED',
+          ).length,
+          rejected: docs.filter(d => d.status === 'REJECTED').length,
+        });
+      } catch (err) {
+        Toast.show({type: 'error', text1: 'Failed to load data'});
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [navigation],
+  );
 
   useEffect(() => {
     (async () => {
@@ -1025,7 +1059,7 @@ const CustomerDashboardScreen = ({ navigation }) => {
     })();
   }, [loadData]);
 
-  const handleMenuSelect = (menuName) => {
+  const handleMenuSelect = menuName => {
     setSidebarOpen(false);
 
     if (menuName === 'Status') {
@@ -1058,8 +1092,9 @@ const CustomerDashboardScreen = ({ navigation }) => {
     navigation.replace('Login');
   };
 
-  const renderDocumentItem = ({ item }) => {
-    const label = DOCUMENT_LABELS[item.documentType] || item.documentType || item.type;
+  const renderDocumentItem = ({item}) => {
+    const label =
+      DOCUMENT_LABELS[item.documentType] || item.documentType || item.type;
 
     return (
       <View style={styles.docCard}>
@@ -1078,7 +1113,9 @@ const CustomerDashboardScreen = ({ navigation }) => {
           <StatusBadge status={item.status} />
         </View>
 
-        {item.remarks && <Text style={styles.docRemarks}>💬 {item.remarks}</Text>}
+        {item.remarks && (
+          <Text style={styles.docRemarks}>💬 {item.remarks}</Text>
+        )}
       </View>
     );
   };
@@ -1107,8 +1144,7 @@ const CustomerDashboardScreen = ({ navigation }) => {
                   loadData(userData?.id);
                 }}
               />
-            }
-          >
+            }>
             <View style={styles.welcomeCard}>
               <Text style={styles.welcomeText}>
                 Welcome, {profile?.fullName || userData?.name || 'Customer'} 👋
@@ -1118,7 +1154,9 @@ const CustomerDashboardScreen = ({ navigation }) => {
               </Text>
             </View>
 
-            <TouchableOpacity style={styles.applyLoanBtn} onPress={handleApplyLoan}>
+            <TouchableOpacity
+              style={styles.applyLoanBtn}
+              onPress={handleApplyLoan}>
               <View>
                 <Text style={styles.applyLoanTitle}>Apply for Car Loan</Text>
                 <Text style={styles.applyLoanSub}>
@@ -1135,10 +1173,11 @@ const CustomerDashboardScreen = ({ navigation }) => {
                   applicationNumber: `USER-${userData?.id}`,
                   userId: userData?.id,
                 })
-              }
-            >
+              }>
               <View>
-                <Text style={styles.statusShortcutTitle}>Application Status</Text>
+                <Text style={styles.statusShortcutTitle}>
+                  Application Status
+                </Text>
                 <Text style={styles.statusShortcutSub}>
                   Track your loan application progress
                 </Text>
@@ -1203,15 +1242,21 @@ const CustomerDashboardScreen = ({ navigation }) => {
       case 'Documents':
         return (
           <View style={styles.flex}>
-            <Text style={styles.sectionTitle}>My Documents ({documents.length})</Text>
+            <Text style={styles.sectionTitle}>
+              My Documents ({documents.length})
+            </Text>
 
             <FlatList
               data={documents}
-              keyExtractor={(item, i) => String(item.documentId ?? item.id ?? i)}
+              keyExtractor={(item, i) =>
+                String(item.documentId ?? item.id ?? i)
+              }
               renderItem={renderDocumentItem}
               ListEmptyComponent={
                 <View style={styles.center}>
-                  <Text style={styles.emptyText}>No documents uploaded yet</Text>
+                  <Text style={styles.emptyText}>
+                    No documents uploaded yet
+                  </Text>
                 </View>
               }
               refreshControl={
@@ -1271,8 +1316,7 @@ const CustomerDashboardScreen = ({ navigation }) => {
       <View style={styles.topBar}>
         <TouchableOpacity
           onPress={() => setSidebarOpen(true)}
-          style={styles.menuBtn}
-        >
+          style={styles.menuBtn}>
           <Text style={styles.menuBtnText}>☰</Text>
         </TouchableOpacity>
 
@@ -1291,8 +1335,8 @@ const CustomerDashboardScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: COLORS.primary },
-  flex: { flex: 1 },
+  safeArea: {flex: 1, backgroundColor: COLORS.primary},
+  flex: {flex: 1},
 
   topBar: {
     flexDirection: 'row',
@@ -1303,9 +1347,9 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     gap: SPACING.md,
   },
-  menuBtn: { padding: SPACING.xs },
-  menuBtnText: { color: COLORS.white, fontSize: 22 },
-  pageTitle: { flex: 1, color: COLORS.white, fontSize: 18, fontWeight: '700' },
+  menuBtn: {padding: SPACING.xs},
+  menuBtnText: {color: COLORS.white, fontSize: 22},
+  pageTitle: {flex: 1, color: COLORS.white, fontSize: 18, fontWeight: '700'},
   avatarCircle: {
     width: 36,
     height: 36,
@@ -1314,7 +1358,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarText: { color: COLORS.primary, fontWeight: '800', fontSize: 14 },
+  avatarText: {color: COLORS.primary, fontWeight: '800', fontSize: 14},
 
   content: {
     flex: 1,
@@ -1342,8 +1386,8 @@ const styles = StyleSheet.create({
     padding: SPACING.lg,
     marginBottom: SPACING.md,
   },
-  welcomeText: { color: COLORS.white, fontSize: 18, fontWeight: '700' },
-  welcomeSub: { color: '#8fa3c7', fontSize: 13, marginTop: 4 },
+  welcomeText: {color: COLORS.white, fontSize: 18, fontWeight: '700'},
+  welcomeSub: {color: '#8fa3c7', fontSize: 13, marginTop: 4},
 
   applyLoanBtn: {
     backgroundColor: COLORS.accent || '#20C7B5',
@@ -1416,16 +1460,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: SPACING.xs,
   },
-  paymentLabel: { fontSize: 13, color: COLORS.textSecondary },
-  paymentValue: { fontSize: 13, fontWeight: '600', color: COLORS.text },
+  paymentLabel: {fontSize: 13, color: COLORS.textSecondary},
+  paymentValue: {fontSize: 13, fontWeight: '600', color: COLORS.text},
   paymentTotal: {
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
     paddingTop: SPACING.xs,
     marginTop: SPACING.xs,
   },
-  paymentTotalLabel: { fontSize: 14, fontWeight: '700', color: COLORS.text },
-  paymentTotalValue: { fontSize: 16, fontWeight: '800', color: COLORS.accent },
+  paymentTotalLabel: {fontSize: 14, fontWeight: '700', color: COLORS.text},
+  paymentTotalValue: {fontSize: 16, fontWeight: '800', color: COLORS.accent},
 
   docCard: {
     backgroundColor: COLORS.white,
@@ -1434,7 +1478,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
     elevation: 1,
   },
-  docCardRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md },
+  docCardRow: {flexDirection: 'row', alignItems: 'center', gap: SPACING.md},
   docIconCircle: {
     width: 40,
     height: 40,
@@ -1443,19 +1487,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  docIcon: { fontSize: 20 },
-  docInfo: { flex: 1 },
-  docType: { fontSize: 14, fontWeight: '600', color: COLORS.text },
-  docFileName: { fontSize: 12, color: COLORS.textSecondary, marginTop: 2 },
-  docRemarks: { fontSize: 12, color: COLORS.textSecondary, marginTop: SPACING.xs },
+  docIcon: {fontSize: 20},
+  docInfo: {flex: 1},
+  docType: {fontSize: 14, fontWeight: '600', color: COLORS.text},
+  docFileName: {fontSize: 12, color: COLORS.textSecondary, marginTop: 2},
+  docRemarks: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    marginTop: SPACING.xs,
+  },
 
   badge: {
     paddingHorizontal: SPACING.sm,
     paddingVertical: 3,
     borderRadius: RADIUS.sm,
   },
-  badgeText: { fontSize: 11, fontWeight: '700' },
-  emptyText: { color: COLORS.textSecondary, fontSize: 14 },
+  badgeText: {fontSize: 11, fontWeight: '700'},
+  emptyText: {color: COLORS.textSecondary, fontSize: 14},
 
   settingsCard: {
     backgroundColor: COLORS.white,

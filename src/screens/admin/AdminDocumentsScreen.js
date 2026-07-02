@@ -13,10 +13,10 @@ import Toast from 'react-native-toast-message';
 const TABS = ['Pending', 'Verified'];
 
 const STATUS_COLOR = {
-  PENDING:                      '#F59E0B',
-  APPROVED:                     '#10B981',
-  VERIFIED:                     '#10B981',
-  REJECTED:                     '#EF4444',
+  PENDING: '#F59E0B',
+  APPROVED: '#10B981',
+  VERIFIED: '#10B981',
+  REJECTED: '#EF4444',
   PAYMENT_VERIFICATION_PENDING: '#F59E0B',
 };
 
@@ -25,27 +25,27 @@ const ACTIONABLE_STATUSES = ['PENDING', 'PAYMENT_VERIFICATION_PENDING'];
 
 // Priority-ordered customer name resolver
 const getCustomerName = (item) =>
-  item.user?.fullName  ||
-  item.user?.name      ||
-  item.customerName    ||
-  item.fullName        ||
-  item.userName        ||
-  item.name            ||
+  item.user?.fullName ||
+  item.user?.name ||
+  item.customerName ||
+  item.fullName ||
+  item.userName ||
+  item.name ||
   `User #${item.userId || '—'}`;
 
 const AdminDocumentsScreen = ({ navigation, route }) => {
-  const filterUserId   = route?.params?.userId;
+  const filterUserId = route?.params?.userId;
   const filterUserName = route?.params?.userName;
 
-  const [activeTab, setActiveTab]         = useState('Pending');
-  const [docs, setDocs]                   = useState([]);
-  const [loading, setLoading]             = useState(true);
-  const [refreshing, setRefreshing]       = useState(false);
+  const [activeTab, setActiveTab] = useState('Pending');
+  const [docs, setDocs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState(null);
-  const [previewModal, setPreviewModal]   = useState({ visible: false, url: null });
-  const [rejectModal, setRejectModal]     = useState({ visible: false, docId: null });
-  const [remarkInputs, setRemarkInputs]   = useState({});
-  const [remarks, setRemarks]             = useState('');
+  const [previewModal, setPreviewModal] = useState({ visible: false, url: null });
+  const [rejectModal, setRejectModal] = useState({ visible: false, docId: null });
+  const [remarkInputs, setRemarkInputs] = useState({});
+  const [remarks, setRemarks] = useState('');
 
   // ── Load ────────────────────────────────────────────────────────────────────
   const loadDocs = useCallback(async (tab = activeTab) => {
@@ -77,7 +77,7 @@ const AdminDocumentsScreen = ({ navigation, route }) => {
   // ── Preview ─────────────────────────────────────────────────────────────────
   const handlePreview = async (docId, fileName) => {
     const previewUrl = `${api.defaults.baseURL}/documents/preview/${docId}`;
-    const isPdf      = (fileName || '').toLowerCase().endsWith('.pdf');
+    const isPdf = (fileName || '').toLowerCase().endsWith('.pdf');
 
     if (isPdf) {
       Linking.openURL(previewUrl).catch(() =>
@@ -88,7 +88,7 @@ const AdminDocumentsScreen = ({ navigation, route }) => {
 
     try {
       const token = await AsyncStorage.getItem('token');
-      const res   = await fetch(previewUrl, {
+      const res = await fetch(previewUrl, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (!res.ok) {
@@ -170,12 +170,12 @@ const AdminDocumentsScreen = ({ navigation, route }) => {
 
   // ── Render item ─────────────────────────────────────────────────────────────
   const renderItem = ({ item }) => {
-    const id           = item.documentId || item.id;
-    const status       = (item.status || 'PENDING').toUpperCase();
-    const color        = STATUS_COLOR[status] || '#F59E0B';
-    const isActing     = actionLoading?.startsWith(String(id));
+    const id = item.documentId || item.id;
+    const status = (item.status || 'PENDING').toUpperCase();
+    const color = STATUS_COLOR[status] || '#F59E0B';
+    const isActing = actionLoading?.startsWith(String(id));
     const isActionable = ACTIONABLE_STATUSES.includes(status);
-    const fileName     = item.fileName || item.originalFileName || '';
+    const fileName = item.fileName || item.originalFileName || '';
 
     return (
       <View style={styles.card}>
@@ -398,7 +398,7 @@ const styles = StyleSheet.create({
   topBar: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: COLORS.primary, paddingHorizontal: SPACING.md,
-      paddingVertical: 15,
+    paddingVertical: 15,
     paddingTop: 20, gap: SPACING.sm,
   },
   backBtn: { padding: SPACING.xs },

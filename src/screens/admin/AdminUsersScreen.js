@@ -29,7 +29,7 @@
 // // // // //     } catch (e) {
 // // // // //       Toast.show({ type: 'error', text1: e?.response?.data?.message || 'Failed to load users' });
 // // // // //       setUsers([]);
-      
+
 // // // // //     } finally {
 // // // // //       setLoading(false);
 // // // // //       setRefreshing(false);
@@ -3985,7 +3985,7 @@ const AdminUsersScreen = ({ navigation }) => {
       const list = unwrapList(response);
       setBanks(list);
     } catch (error) {
-     // console.log('BANK LOAD ERROR =>', error?.response?.data || error.message);
+      // console.log('BANK LOAD ERROR =>', error?.response?.data || error.message);
       setBanks([]);
     }
   }, []);
@@ -3997,40 +3997,73 @@ const AdminUsersScreen = ({ navigation }) => {
       let userList = [];
       let personalInfoList = [];
       let paymentHistoryList = [];
+      let historyUserList = [];
 
-      const [usersRes, personalRes, paymentRes] = await Promise.allSettled([
+      const [usersRes, personalRes, paymentRes, historyUsersRes] = await Promise.allSettled([
         api.get('/user/all'),
         api.get('/personal-info/all'),
         loadPaymentHistory(),
+        api.get('/user/history'),
       ]);
 
       if (usersRes.status === 'fulfilled') {
         userList = unwrapList(usersRes.value);
-       // console.log('USER ALL RESPONSE =>', JSON.stringify(usersRes.value.data));
+        console.log('USER ALL SUCCESS =>', userList.length);
       } else {
-        // console.log(
-        //   'USER ALL ERROR =>',
-        //   usersRes.reason?.response?.data || usersRes.reason?.message,
-        // );
+        const errMsg = usersRes.reason?.response?.data?.message || usersRes.reason?.message || 'Unknown error';
+        console.log('USER ALL ERROR =>', errMsg);
       }
 
       if (personalRes.status === 'fulfilled') {
         personalInfoList = unwrapList(personalRes.value);
-        //console.log('PERSONAL INFO RESPONSE =>', JSON.stringify(personalRes.value.data));
       } else {
-        console.log(
-          'PERSONAL INFO ERROR =>',
-          personalRes.reason?.response?.data || personalRes.reason?.message,
-        );
+        const errMsg = personalRes.reason?.response?.data?.message || personalRes.reason?.message || 'Unknown error';
+        console.log('PERSONAL INFO ERROR =>', errMsg);
       }
 
       if (paymentRes.status === 'fulfilled') {
         paymentHistoryList = paymentRes.value || [];
       }
 
+      if (historyUsersRes.status === 'fulfilled') {
+        historyUserList = unwrapList(historyUsersRes.value);
+        console.log('USER HISTORY SUCCESS =>', historyUserList.length);
+      } else {
+        const errMsg = historyUsersRes.reason?.response?.data?.message || historyUsersRes.reason?.message || 'Unknown error';
+        console.log('USER HISTORY ERROR =>', errMsg);
+      }
+
       const paymentUsers = paymentHistoryList.map(paymentToUser);
 
-      const merged = mergeUsersById(paymentUsers, personalInfoList, userList);
+      const merged = mergeUsersById(paymentUsers, personalInfoList, userList, historyUserList);
+
+      console.log('DIAGNOSTICS =>');
+      console.log('- userList length:', userList.length);
+      console.log('- personalInfoList length:', personalInfoList.length);
+      console.log('- paymentHistoryList length:', paymentHistoryList.length);
+      console.log('- merged length:', merged.length);
+
+      userList.forEach(u => {
+        if (u.registrationType === 'DEALER' || u.dealerCode || u.dealerId) {
+          console.log('DEALER-CREATED USER IN USERLIST:', {
+            id: u.id,
+            fullName: u.fullName || u.name,
+            registrationType: u.registrationType,
+            role: u.role,
+          });
+        }
+      });
+
+      merged.forEach(u => {
+        if (u.registrationType === 'DEALER' || u.dealerCode || u.dealerId) {
+          console.log('DEALER-CREATED USER IN MERGED:', {
+            id: u.id || u.userId,
+            fullName: u.fullName || u.name,
+            registrationType: u.registrationType,
+            role: u.role,
+          });
+        }
+      });
 
       setPayments(paymentHistoryList);
       setAllUsers(merged);
@@ -4208,20 +4241,30 @@ const AdminUsersScreen = ({ navigation }) => {
     const assignedBankId =
       item.bankId ||
       item.assignedBankId ||
+      item.bank_id ||
+      item.assigned_bank_id ||
       item.bank?.bankId ||
       item.bank?.id ||
+      item.bank?.bank_id ||
       item.assignedBank?.bankId ||
-      item.assignedBank?.id;
+      item.assignedBank?.id ||
+      item.assignedBank?.bank_id;
 
     if (!assignedBankId) return null;
 
     const bank = banks.find(
-      b => String(b.bankId || b.id) === String(assignedBankId),
+      b => String(b.bankId || b.id || b.bank_id || '') === String(assignedBankId),
     );
 
     return bank || {
       bankId: assignedBankId,
-      bankName: item.bankName || item.assignedBankName || `Bank ID: ${assignedBankId}`,
+      bankName:
+        item.bankName ||
+        item.assignedBankName ||
+        item.bank_name ||
+        item.assigned_bank_name ||
+        (bank ? bank.bankName || bank.name : null) ||
+        `Bank ID: ${assignedBankId}`,
     };
   };
 

@@ -4,8 +4,10 @@ import {
   TouchableOpacity, ScrollView, ActivityIndicator,
 } from 'react-native';
 import DocumentPicker from 'react-native-document-picker';
+import { launchCamera } from 'react-native-image-picker';
 import api from '../../services/api';
 import Toast from 'react-native-toast-message';
+import { sanitizeFileName } from '../../services/fileUtils';
 import { COLORS, SPACING, RADIUS } from '../../constants/theme';
 
 const ALLOWED_TYPES = [DocumentPicker.types.images, DocumentPicker.types.pdf];
@@ -16,7 +18,9 @@ const TABS = [
 ];
 
 const SALARIED_DOCS = [
-  { type: 'SALARY_SLIP', label: 'Salary Slip', icon: '💰' },
+  { type: 'SALARY_SLIP_1', label: 'Salary Slip (Month 1)', icon: '💰' },
+  { type: 'SALARY_SLIP_2', label: 'Salary Slip (Month 2)', icon: '💰' },
+  { type: 'SALARY_SLIP_3', label: 'Salary Slip (Month 3)', icon: '💰' },
   { type: 'APPOINTMENT_LETTER', label: 'Appointment Letter', icon: '📝' },
   { type: 'BANK_STATEMENT', label: 'Bank Statement', icon: '🏦' },
 ];
@@ -36,10 +40,17 @@ const IncomeInfoScreen = ({ navigation, route }) => {
 
   const pickFile = async (docType) => {
     try {
-      const result = await DocumentPicker.pickSingle({ type: ALLOWED_TYPES });
+      const result = await DocumentPicker.pickSingle({
+        type: ALLOWED_TYPES,
+        copyTo: 'cachesDirectory',
+      });
       setFiles(prev => ({
         ...prev,
-        [docType]: { uri: result.uri, name: result.name, type: result.type },
+        [docType]: {
+          uri: result.fileCopyUri || result.uri,
+          name: sanitizeFileName(result.name, docType),
+          type: result.type || 'application/octet-stream',
+        },
       }));
     } catch (err) {
       if (!DocumentPicker.isCancel(err)) {
@@ -48,11 +59,53 @@ const IncomeInfoScreen = ({ navigation, route }) => {
     }
   };
 
+  const captureFromCamera = async (docType) => {
+    try {
+      const result = await launchCamera({
+        mediaType: 'photo',
+        quality: 0.8,
+        maxWidth: 1920,
+        maxHeight: 1920,
+        saveToPhotos: false,
+      });
+
+      if (result.didCancel) return;
+
+      if (result.errorCode) {
+        Toast.show({
+          type: 'error',
+          text1: result.errorCode === 'camera_unavailable'
+            ? 'Camera not available'
+            : result.errorMessage || 'Camera error',
+        });
+        return;
+      }
+
+      const asset = result.assets?.[0];
+      if (asset) {
+        setFiles(prev => ({
+          ...prev,
+          [docType]: {
+            uri: asset.uri,
+            name: sanitizeFileName(asset.fileName, docType),
+            type: asset.type || 'image/jpeg',
+          },
+        }));
+      }
+    } catch (err) {
+      Toast.show({ type: 'error', text1: 'Could not open camera' });
+    }
+  };
+
   const uploadDocument = async (docType, file) => {
     const formData = new FormData();
-    formData.append('userId', userId);
+    formData.append('userId', String(userId));
     formData.append('type', docType);
-    formData.append('file', { uri: file.uri, name: file.name, type: file.type });
+    formData.append('file', {
+      uri: file.uri,
+      name: sanitizeFileName(file.name, docType),
+      type: file.type || 'application/octet-stream',
+    });
     await api.post('/documents/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
@@ -101,16 +154,29 @@ const IncomeInfoScreen = ({ navigation, route }) => {
               <Text style={styles.fileIcon}>📄</Text>
               <Text style={styles.fileName} numberOfLines={1}>{file.name}</Text>
             </View>
-            <TouchableOpacity onPress={() => pickFile(docType)} style={styles.replaceBtn}>
-              <Text style={styles.replaceBtnText}>Replace</Text>
-            </TouchableOpacity>
+            <View style={styles.replaceActions}>
+              <TouchableOpacity onPress={() => captureFromCamera(docType)} style={styles.replaceCameraBtn}>
+                <Text style={styles.replaceBtnText}>📷</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => pickFile(docType)} style={styles.replaceBtn}>
+                <Text style={styles.replaceBtnText}>Replace</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         ) : (
-          <TouchableOpacity style={styles.uploadBox} onPress={() => pickFile(docType)}>
+          <View style={styles.uploadBox}>
             <Text style={styles.uploadBoxIcon}>⬆️</Text>
-            <Text style={styles.uploadBoxText}>Tap to upload</Text>
+            <Text style={styles.uploadBoxText}>Upload Document</Text>
             <Text style={styles.uploadBoxHint}>JPG, PNG or PDF</Text>
-          </TouchableOpacity>
+            <View style={styles.uploadActions}>
+              <TouchableOpacity style={styles.cameraBtn} onPress={() => captureFromCamera(docType)}>
+                <Text style={styles.cameraBtnText}>📷 Camera</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.galleryBtn} onPress={() => pickFile(docType)}>
+                <Text style={styles.galleryBtnText}>📁 Gallery / Files</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         )}
       </View>
     );
@@ -320,6 +386,48 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.sm,
   },
   replaceBtnText: { fontSize: 12, fontWeight: '700', color: COLORS.primary },
+
+  replaceActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  replaceCameraBtn: {
+    backgroundColor: COLORS.accent + '22',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: RADIUS.sm,
+  },
+
+  uploadActions: {
+    flexDirection: 'row',
+    marginTop: SPACING.sm,
+    gap: SPACING.sm,
+  },
+  cameraBtn: {
+    flex: 1,
+    backgroundColor: COLORS.primary,
+    paddingVertical: 10,
+    borderRadius: RADIUS.sm,
+    alignItems: 'center',
+  },
+  cameraBtnText: {
+    color: COLORS.white,
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  galleryBtn: {
+    flex: 1,
+    backgroundColor: COLORS.accent + '22',
+    paddingVertical: 10,
+    borderRadius: RADIUS.sm,
+    alignItems: 'center',
+  },
+  galleryBtnText: {
+    color: COLORS.primary,
+    fontWeight: '700',
+    fontSize: 13,
+  },
 
   primaryBtn: {
     backgroundColor: COLORS.primary,

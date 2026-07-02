@@ -3,8 +3,13 @@ import api from './api';
 
 const unwrap = (response) => response.data?.data ?? response.data;
 
-export const markPaymentSuccess = async (userId) => {
-  const response = await api.put(`/user/payment-success/${userId}`);
+export const createRazorpayOrder = async (userId) => {
+  const response = await api.post(`/user/create-order/${userId}`);
+  return unwrap(response);
+};
+
+export const markPaymentSuccess = async (userId, orderId, paymentId) => {
+  const response = await api.put(`/user/payment-success/${userId}/${orderId}/${paymentId}`);
   return unwrap(response);
 };
 

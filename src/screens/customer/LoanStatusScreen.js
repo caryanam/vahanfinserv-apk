@@ -5,31 +5,33 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import DocumentPicker from 'react-native-document-picker';
+import { launchCamera } from 'react-native-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../../services/api';
 import Toast from 'react-native-toast-message';
+import { sanitizeFileName } from '../../services/fileUtils';
 import { COLORS, SPACING, RADIUS } from '../../constants/theme';
 
 // Payment status constants
-const PAY_PENDING  = 'PAYMENT_VERIFICATION_PENDING';
+const PAY_PENDING = 'PAYMENT_VERIFICATION_PENDING';
 const PAY_APPROVED = 'PAYMENT_APPROVED';
 const PAY_REJECTED = 'PAYMENT_REJECTED';
 
 const PAYMENT_STATUS_CONFIG = {
-  [PAY_PENDING]:  { color: '#F59E0B', label: 'Payment Verification Pending', icon: '⏳' },
-  [PAY_APPROVED]: { color: '#10B981', label: 'Payment Approved',             icon: '✅' },
-  [PAY_REJECTED]: { color: '#EF4444', label: 'Payment Rejected',             icon: '❌' },
+  [PAY_PENDING]: { color: '#F59E0B', label: 'Payment Verification Pending', icon: '⏳' },
+  [PAY_APPROVED]: { color: '#10B981', label: 'Payment Approved', icon: '✅' },
+  [PAY_REJECTED]: { color: '#EF4444', label: 'Payment Rejected', icon: '❌' },
 };
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const ALLOWED_TYPES = [DocumentPicker.types.images, DocumentPicker.types.pdf];
 
-const KYC_TYPES         = ['AADHAAR', 'PAN'];
+const KYC_TYPES = ['AADHAAR_1', 'AADHAAR_2', 'PAN'];
 const RESIDENTIAL_TYPES = ['LIGHT_BILL', 'RENTAL_AGREEMENT'];
-const INCOME_TYPES      = ['SALARY_SLIP', 'APPOINTMENT_LETTER', 'BANK_STATEMENT', 'ITR_RETURN'];
-const VEHICLE_TYPES     = [
-  'RC', 'INSURANCE', 'VEHICLE_INVOICE', 'VEHICLE_PHOTO',
+const INCOME_TYPES = ['SALARY_SLIP_1', 'SALARY_SLIP_2', 'SALARY_SLIP_3', 'APPOINTMENT_LETTER', 'BANK_STATEMENT', 'ITR_RETURN'];
+const VEHICLE_TYPES = [
+  'RC_1', 'RC_2', 'INSURANCE',
   'ODOMETER_READING', 'CHASSIS_NUMBER', 'CAR_FRONT_SIDE_PHOTO', 'CAR_BACK_SIDE_PHOTO',
 ];
 
@@ -39,7 +41,7 @@ const DOC_SECTIONS = [
     title: 'KYC Documents',
     icon: '🪪',
     types: KYC_TYPES,
-    labels: { AADHAAR: 'Aadhaar Card', PAN: 'PAN Card' },
+    labels: { AADHAAR_1: 'Aadhaar Front Side', AADHAAR_2: 'Aadhaar Back Side', PAN: 'PAN Card' },
   },
   {
     key: 'residential',
@@ -54,7 +56,9 @@ const DOC_SECTIONS = [
     icon: '💼',
     types: INCOME_TYPES,
     labels: {
-      SALARY_SLIP: 'Salary Slip',
+      SALARY_SLIP_1: 'Salary Slip Month 1',
+      SALARY_SLIP_2: 'Salary Slip Month 2',
+      SALARY_SLIP_3: 'Salary Slip Month 3',
       APPOINTMENT_LETTER: 'Appointment Letter',
       BANK_STATEMENT: 'Bank Statement',
       ITR_RETURN: 'ITR Return',
@@ -66,10 +70,9 @@ const DOC_SECTIONS = [
     icon: '🚗',
     types: VEHICLE_TYPES,
     labels: {
-      RC: 'RC',
+      RC_1: 'RC Front Side',
+      RC_2: 'RC Back Side',
       INSURANCE: 'Insurance',
-      VEHICLE_INVOICE: 'Vehicle Invoice',
-      VEHICLE_PHOTO: 'Vehicle Photo',
       ODOMETER_READING: 'Odometer Reading',
       CHASSIS_NUMBER: 'Chassis Number',
       CAR_FRONT_SIDE_PHOTO: 'Car Front Side Photo',
@@ -79,43 +82,43 @@ const DOC_SECTIONS = [
 ];
 
 // ─── Step status tokens ───────────────────────────────────────────────────────
-const S_DONE     = 'DONE';
-const S_CURRENT  = 'CURRENT';
-const S_PENDING  = 'PENDING';
+const S_DONE = 'DONE';
+const S_CURRENT = 'CURRENT';
+const S_PENDING = 'PENDING';
 const S_REJECTED = 'REJECTED';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const isPdf = (name) => name?.toLowerCase().endsWith('.pdf');
 
-const hasAny   = (map, types) => types.some(t => !!map[t]);
-const allDone  = (map, types) => types.every(t => map[t] && ['APPROVED','VERIFIED'].includes((map[t].status||'').toUpperCase()));
-const anyRej   = (map, types) => types.some(t => map[t] && (map[t].status||'').toUpperCase() === 'REJECTED');
+const hasAny = (map, types) => types.some(t => !!map[t]);
+const allDone = (map, types) => types.every(t => map[t] && ['APPROVED', 'VERIFIED'].includes((map[t].status || '').toUpperCase()));
+const anyRej = (map, types) => types.some(t => map[t] && (map[t].status || '').toUpperCase() === 'REJECTED');
 
 const docStatusColor = (status) => {
   switch ((status || '').toUpperCase()) {
     case 'APPROVED':
     case 'VERIFIED': return COLORS.success;
     case 'REJECTED': return COLORS.danger;
-    default:         return COLORS.warning;
+    default: return COLORS.warning;
   }
 };
 
 // Timeline step circle colors
 const stepCircleStyle = (s) => {
   switch (s) {
-    case S_DONE:     return { bg: COLORS.success,      border: COLORS.success };
-    case S_CURRENT:  return { bg: COLORS.info,         border: COLORS.info };
-    case S_REJECTED: return { bg: COLORS.danger,       border: COLORS.danger };
-    default:         return { bg: COLORS.border,       border: COLORS.border };
+    case S_DONE: return { bg: COLORS.success, border: COLORS.success };
+    case S_CURRENT: return { bg: COLORS.info, border: COLORS.info };
+    case S_REJECTED: return { bg: COLORS.danger, border: COLORS.danger };
+    default: return { bg: COLORS.border, border: COLORS.border };
   }
 };
 
 const stepBadgeStyle = (s) => {
   switch (s) {
-    case S_DONE:     return { bg: COLORS.success + '22', color: COLORS.success };
-    case S_CURRENT:  return { bg: COLORS.info    + '22', color: COLORS.info };
-    case S_REJECTED: return { bg: COLORS.danger  + '22', color: COLORS.danger };
-    default:         return { bg: COLORS.border,         color: COLORS.textMuted };
+    case S_DONE: return { bg: COLORS.success + '22', color: COLORS.success };
+    case S_CURRENT: return { bg: COLORS.info + '22', color: COLORS.info };
+    case S_REJECTED: return { bg: COLORS.danger + '22', color: COLORS.danger };
+    default: return { bg: COLORS.border, color: COLORS.textMuted };
   }
 };
 
@@ -123,11 +126,11 @@ const stepBadgeStyle = (s) => {
 const LoanStatusScreen = ({ navigation, route }) => {
   const { applicationNumber, userId } = route.params || {};
 
-  const [loading, setLoading]         = useState(true);
-  const [user, setUser]               = useState(null);
-  const [documents, setDocuments]     = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(null);
+  const [documents, setDocuments] = useState([]);
   const [reuploading, setReuploading] = useState({});
-  const [preview, setPreview]         = useState(null);
+  const [preview, setPreview] = useState(null);
   const [paymentStatus, setPaymentStatus] = useState(null);
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
@@ -163,11 +166,19 @@ const LoanStatusScreen = ({ navigation, route }) => {
   const handleReupload = async (doc) => {
     const docId = doc.id || doc.documentId;
     try {
-      const result = await DocumentPicker.pickSingle({ type: ALLOWED_TYPES });
-      setReuploading(prev => ({ ...prev, [docId]: true }));
+      const result = await DocumentPicker.pickSingle({
+        type: ALLOWED_TYPES,
+        copyTo: 'cachesDirectory',
+      });
+      const docType = doc.documentType || doc.type || 'document';
+      const cleanName = sanitizeFileName(result.name, docType);
 
       const formData = new FormData();
-      formData.append('file', { uri: result.uri, name: result.name, type: result.type });
+      formData.append('file', {
+        uri: result.fileCopyUri || result.uri,
+        name: cleanName,
+        type: result.type || 'application/octet-stream',
+      });
 
       await api.put(`/documents/${docId}`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -176,7 +187,7 @@ const LoanStatusScreen = ({ navigation, route }) => {
       setDocuments(prev =>
         prev.map(d =>
           (d.id || d.documentId) === docId
-            ? { ...d, status: 'PENDING', fileName: result.name }
+            ? { ...d, status: 'PENDING', fileName: cleanName }
             : d
         )
       );
@@ -191,10 +202,68 @@ const LoanStatusScreen = ({ navigation, route }) => {
     }
   };
 
+  const handleReuploadCamera = async (doc) => {
+    const docId = doc.id || doc.documentId;
+    try {
+      const result = await launchCamera({
+        mediaType: 'photo',
+        quality: 0.8,
+        maxWidth: 1920,
+        maxHeight: 1920,
+        saveToPhotos: false,
+      });
+
+      if (result.didCancel) return;
+
+      if (result.errorCode) {
+        Toast.show({
+          type: 'error',
+          text1: result.errorCode === 'camera_unavailable'
+            ? 'Camera not available'
+            : result.errorMessage || 'Camera error',
+        });
+        return;
+      }
+
+      const asset = result.assets?.[0];
+      if (!asset) return;
+
+      const docType = doc.documentType || doc.type || 'document';
+      const cleanName = sanitizeFileName(asset.fileName, docType);
+
+      setReuploading(prev => ({ ...prev, [docId]: true }));
+
+      const formData = new FormData();
+      formData.append('file', {
+        uri: asset.uri,
+        name: cleanName,
+        type: asset.type || 'image/jpeg',
+      });
+
+      await api.put(`/documents/${docId}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+
+      setDocuments(prev =>
+        prev.map(d =>
+          (d.id || d.documentId) === docId
+            ? { ...d, status: 'PENDING', fileName: cleanName }
+            : d
+        )
+      );
+      Toast.show({ type: 'success', text1: 'Document re-uploaded successfully' });
+      fetchData();
+    } catch (err) {
+      Toast.show({ type: 'error', text1: err?.response?.data?.message || 'Re-upload failed' });
+    } finally {
+      setReuploading(prev => ({ ...prev, [docId]: false }));
+    }
+  };
+
   // ── Preview ────────────────────────────────────────────────────────────────
   const openPreview = async (doc) => {
-    const docId      = doc.id || doc.documentId;
-    const fileName   = doc.fileName || doc.documentName || '';
+    const docId = doc.id || doc.documentId;
+    const fileName = doc.fileName || doc.documentName || '';
     const previewUrl = `${api.defaults.baseURL}/documents/preview/${docId}`;
 
     if (isPdf(fileName)) {
@@ -206,7 +275,7 @@ const LoanStatusScreen = ({ navigation, route }) => {
 
     try {
       const token = await AsyncStorage.getItem('token');
-      const res   = await fetch(previewUrl, {
+      const res = await fetch(previewUrl, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (!res.ok) { Toast.show({ type: 'error', text1: 'Unable to load preview' }); return; }
@@ -229,11 +298,11 @@ const LoanStatusScreen = ({ navigation, route }) => {
     return acc;
   }, {});
 
-  const kycUploaded         = hasAny(docsByType, KYC_TYPES);
+  const kycUploaded = hasAny(docsByType, KYC_TYPES);
   const residentialUploaded = hasAny(docsByType, RESIDENTIAL_TYPES);
-  const incomeUploaded      = hasAny(docsByType, INCOME_TYPES);
-  const vehicleUploaded     = hasAny(docsByType, VEHICLE_TYPES);
-  const allUploaded         = kycUploaded && residentialUploaded && incomeUploaded && vehicleUploaded;
+  const incomeUploaded = hasAny(docsByType, INCOME_TYPES);
+  const vehicleUploaded = hasAny(docsByType, VEHICLE_TYPES);
+  const allUploaded = kycUploaded && residentialUploaded && incomeUploaded && vehicleUploaded;
 
   const anyRejected = documents.some(d => (d.status || '').toUpperCase() === 'REJECTED');
   const allApproved = documents.length > 0 &&
@@ -241,12 +310,12 @@ const LoanStatusScreen = ({ navigation, route }) => {
 
   // ── Application-level status banner ───────────────────────────────────────
   const appStatus = anyRejected
-    ? { label: 'Action Required',    color: COLORS.danger,  icon: '⚠️' }
+    ? { label: 'Action Required', color: COLORS.danger, icon: '⚠️' }
     : allApproved
       ? { label: 'Documents Approved', color: COLORS.success, icon: '✅' }
       : allUploaded
-        ? { label: 'Under Review',      color: COLORS.warning, icon: '🔍' }
-        : { label: 'In Progress',       color: COLORS.info,    icon: '📝' };
+        ? { label: 'Under Review', color: COLORS.warning, icon: '🔍' }
+        : { label: 'In Progress', color: COLORS.info, icon: '📝' };
 
   // ── Timeline steps ─────────────────────────────────────────────────────────
   // Each step gets a status: DONE | CURRENT | PENDING | REJECTED
@@ -411,11 +480,11 @@ const LoanStatusScreen = ({ navigation, route }) => {
         </View>
       );
     }
-    const docId      = doc.id || doc.documentId;
-    const status     = (doc.status || 'PENDING').toUpperCase();
+    const docId = doc.id || doc.documentId;
+    const status = (doc.status || 'PENDING').toUpperCase();
     const isRejected = status === 'REJECTED';
-    const uploading  = !!reuploading[docId];
-    const color      = docStatusColor(status);
+    const uploading = !!reuploading[docId];
+    const color = docStatusColor(status);
 
     return (
       <View style={styles.docRow}>
@@ -437,16 +506,25 @@ const LoanStatusScreen = ({ navigation, route }) => {
               <Text style={styles.previewBtnText}>Preview</Text>
             </TouchableOpacity>
             {isRejected && (
-              <TouchableOpacity
-                style={[styles.reuploadBtn, uploading && { opacity: 0.6 }]}
-                onPress={() => handleReupload(doc)}
-                disabled={uploading}
-              >
-                {uploading
-                  ? <ActivityIndicator size="small" color={COLORS.white} />
-                  : <Text style={styles.reuploadBtnText}>Re-upload</Text>
-                }
-              </TouchableOpacity>
+              <View style={styles.reuploadActions}>
+                <TouchableOpacity
+                  style={[styles.reuploadCameraBtn, uploading && { opacity: 0.6 }]}
+                  onPress={() => handleReuploadCamera(doc)}
+                  disabled={uploading}
+                >
+                  <Text style={styles.reuploadCameraBtnText}>📷</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.reuploadBtn, uploading && { opacity: 0.6 }]}
+                  onPress={() => handleReupload(doc)}
+                  disabled={uploading}
+                >
+                  {uploading
+                    ? <ActivityIndicator size="small" color={COLORS.white} />
+                    : <Text style={styles.reuploadBtnText}>Re-upload</Text>
+                  }
+                </TouchableOpacity>
+              </View>
             )}
           </View>
         </View>
@@ -456,7 +534,7 @@ const LoanStatusScreen = ({ navigation, route }) => {
 
   const TimelineStep = ({ step, index, isLast }) => {
     const circle = stepCircleStyle(step.status);
-    const badge  = stepBadgeStyle(step.status);
+    const badge = stepBadgeStyle(step.status);
     const isDone = step.status === S_DONE;
 
     return (
@@ -512,8 +590,8 @@ const LoanStatusScreen = ({ navigation, route }) => {
   // ── Resolve application number — never fall back to userId ─────────────────
   const resolvedAppNo =
     route?.params?.applicationNumber ||
-    route?.params?.loanNumber        ||
-    route?.params?.applicationNo     ||
+    route?.params?.loanNumber ||
+    route?.params?.applicationNo ||
     route?.params?.loanApplicationNumber ||
     null;
 
@@ -651,9 +729,9 @@ const styles = StyleSheet.create({
 
   container: {
     paddingLeft: SPACING.md,
-      paddingRight: SPACING.md,
+    paddingRight: SPACING.md,
     paddingBottom: SPACING.xxl,
-      paddingVertical: 15,
+    paddingVertical: 15,
     paddingTop: 20,
   },
 
@@ -903,6 +981,21 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: COLORS.white,
+  },
+  reuploadActions: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  reuploadCameraBtn: {
+    backgroundColor: COLORS.accent,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: RADIUS.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reuploadCameraBtnText: {
+    fontSize: 13,
   },
 
   // ── Bottom actions ────────────────────────────────────────────────────────

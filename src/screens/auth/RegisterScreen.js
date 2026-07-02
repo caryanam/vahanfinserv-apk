@@ -261,7 +261,7 @@
 
 // export default RegisterScreen;
 // src/screens/auth/RegisterScreen.js
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -277,8 +277,16 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Video from 'react-native-video';
-import { registerUser } from '../../services/customerService';
-import { registerDealer } from '../../services/dealerService';
+import {
+  registerUser,
+  userRegisterVerifyOtp,
+  userSendRegisterOtp,
+} from '../../services/customerService';
+import {
+  registerDealer,
+  dealerRegisterVerifyOtp,
+  dealerSendRegisterOtp,
+} from '../../services/dealerService';
 import { SPACING } from '../../constants/theme';
 import Toast from 'react-native-toast-message';
 
@@ -289,6 +297,11 @@ const RegisterScreen = ({ navigation, route }) => {
   const [role, setRole] = useState(defaultRole);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [otp, setOtp] = useState('');
+  const [otpSending, setOtpSending] = useState(false);
+  const [otpVerifying, setOtpVerifying] = useState(false);
+  const [otpVerified, setOtpVerified] = useState(false);
+  const [resendTimer, setResendTimer] = useState(0);
 
   const [form, setForm] = useState({
     fullName: '',
@@ -296,6 +309,24 @@ const RegisterScreen = ({ navigation, route }) => {
     email: '',
     password: '',
   });
+
+  useEffect(() => {
+    if (resendTimer <= 0) {
+      return undefined;
+    }
+
+    const timer = setTimeout(() => {
+      setResendTimer((prev) => prev - 1);
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [resendTimer]);
+
+  useEffect(() => {
+    setOtp('');
+    setOtpVerified(false);
+    setResendTimer(0);
+  }, [role]);
 
   const handleChange = (field, value) => {
     if (field === 'mobile') {
@@ -306,7 +337,94 @@ const RegisterScreen = ({ navigation, route }) => {
       return;
     }
 
+    if (field === 'email') {
+      setForm((prev) => ({ ...prev, [field]: value }));
+      setOtp('');
+      setOtpVerified(false);
+      setResendTimer(0);
+      return;
+    }
+
     setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleOtpChange = (value) => {
+    const digits = value.replace(/\D/g, '').slice(0, 6);
+    setOtp(digits);
+  };
+
+  const handleSendOtp = async () => {
+    const trimmedEmail = form.email.trim();
+
+    if (!trimmedEmail) {
+      Toast.show({ type: 'error', text1: 'Please enter your email' });
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      Toast.show({ type: 'error', text1: 'Please enter a valid email' });
+      return;
+    }
+
+    setOtpSending(true);
+
+    try {
+      const response = role === 'DEALER'
+        ? await dealerSendRegisterOtp(trimmedEmail)
+        : await userSendRegisterOtp(trimmedEmail);
+
+      setOtp('');
+      setOtpVerified(false);
+      setResendTimer(60);
+      Toast.show({
+        type: 'success',
+        text1: response?.message || 'OTP sent to your email',
+      });
+    } catch (err) {
+      Toast.show({
+        type: 'error',
+        text1: err?.response?.data?.message || err?.response?.data || err?.message || 'Failed to send OTP',
+      });
+    } finally {
+      setOtpSending(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    const trimmedEmail = form.email.trim();
+
+    if (!trimmedEmail) {
+      Toast.show({ type: 'error', text1: 'Please enter your email' });
+      return;
+    }
+
+    if (!/^\d{6}$/.test(otp)) {
+      Toast.show({ type: 'error', text1: 'OTP should be 6 digits' });
+      return;
+    }
+
+    setOtpVerifying(true);
+
+    try {
+      const payload = { email: trimmedEmail, otp };
+      const response = role === 'DEALER'
+        ? await dealerRegisterVerifyOtp(payload)
+        : await userRegisterVerifyOtp(payload);
+
+      setOtpVerified(true);
+      setResendTimer(0);
+      Toast.show({
+        type: 'success',
+        text1: response?.message || 'Email verified successfully',
+      });
+    } catch (err) {
+      Toast.show({
+        type: 'error',
+        text1: err?.response?.data?.message || err?.response?.data || err?.message || 'OTP verification failed',
+      });
+    } finally {
+      setOtpVerifying(false);
+    }
   };
 
   const handleSubmit = async () => {
@@ -320,11 +438,19 @@ const RegisterScreen = ({ navigation, route }) => {
       return;
     }
 
+    if (!otpVerified) {
+      Toast.show({
+        type: 'error',
+        text1: 'Please verify your email first',
+      });
+      return;
+    }
+
     setLoading(true);
 
     const payload = {
       fullName: form.fullName,
-      email: form.email,
+      email: form.email.trim(),
       mobileNumber: form.mobile,
       password: form.password,
       registrationType: role,
@@ -489,6 +615,60 @@ const RegisterScreen = ({ navigation, route }) => {
               />
             </View>
 
+            <Text style={styles.label}>Email Verification</Text>
+            <View style={styles.otpRow}>
+              <View style={styles.otpInputWrap}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter 6-digit OTP"
+                  placeholderTextColor="rgba(255,255,255,0.65)"
+                  keyboardType="number-pad"
+                  maxLength={6}
+                  value={otp}
+                  onChangeText={handleOtpChange}
+                  editable={!otpVerified}
+                />
+              </View>
+
+              <TouchableOpacity
+                style={[styles.otpBtn, (otpSending || resendTimer > 0) && styles.otpBtnDisabled]}
+                onPress={handleSendOtp}
+                disabled={otpSending || resendTimer > 0}
+                activeOpacity={0.85}
+              >
+                {otpSending ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.otpBtnText}>
+                    {resendTimer > 0 ? `Resend ${resendTimer}s` : 'Send OTP'}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.otpActionRow}>
+              <TouchableOpacity
+                style={[styles.otpVerifyBtn, (otpVerifying || otpVerified || !otp) && styles.otpVerifyBtnDisabled]}
+                onPress={handleVerifyOtp}
+                disabled={otpVerifying || otpVerified || !otp}
+                activeOpacity={0.85}
+              >
+                {otpVerifying ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.otpVerifyBtnText}>
+                    {otpVerified ? 'Verified ✓' : 'Verify OTP'}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+
+            <Text style={[styles.otpHint, otpVerified && styles.otpVerifiedText]}>
+              {otpVerified
+                ? 'Email verified successfully. You can now complete registration.'
+                : 'A 6-digit OTP will be sent to your email before registration.'}
+            </Text>
+
             <Text style={styles.label}>Password</Text>
             <View style={styles.inputWrap}>
               <Text style={styles.inputIcon}>🔒</Text>
@@ -507,9 +687,9 @@ const RegisterScreen = ({ navigation, route }) => {
             </View>
 
             <TouchableOpacity
-              style={[styles.submitBtn, loading && styles.submitBtnDisabled]}
+              style={[styles.submitBtn, (loading || !otpVerified) && styles.submitBtnDisabled]}
               onPress={handleSubmit}
-              disabled={loading}
+              disabled={loading || !otpVerified}
               activeOpacity={0.85}
             >
               {loading ? (
@@ -727,6 +907,84 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.10)',
     borderRadius: 12,
     paddingHorizontal: 14,
+  },
+
+  otpRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 4,
+  },
+
+  otpInputWrap: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 50,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.75)',
+    backgroundColor: 'rgba(255,255,255,0.10)',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+  },
+
+  otpBtn: {
+    minWidth: 98,
+    height: 50,
+    borderRadius: 12,
+    backgroundColor: '#0D8BFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+  },
+
+  otpBtnDisabled: {
+    opacity: 0.65,
+  },
+
+  otpBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+
+  otpActionRow: {
+    marginTop: 10,
+    alignItems: 'flex-start',
+  },
+
+  otpVerifyBtn: {
+    height: 42,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.10)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.30)',
+    paddingHorizontal: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  otpVerifyBtnDisabled: {
+    opacity: 0.65,
+  },
+
+  otpVerifyBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+
+  otpHint: {
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 8,
+    marginBottom: 2,
+  },
+
+  otpVerifiedText: {
+    color: '#19D3D0',
+    fontWeight: '700',
   },
 
   inputIcon: {

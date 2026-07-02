@@ -86,7 +86,7 @@
 // //       const id = firstValue(
 // //         body?.id, body?.userId, body?.adminId, body?.dealerId,
 // //         decoded?.id, decoded?.userId, decoded?.adminId, decoded?.dealerId,
-// //         jwt_decode 
+// //         jwt_decode
 // //       );
 
 // //       const userObject = {
@@ -831,7 +831,7 @@
 
 // export default LoginScreen;
 // src/screens/auth/LoginScreen.js
-import React, { useState } from 'react';
+import React, {useState} from 'react';
 import {
   View,
   Text,
@@ -848,26 +848,39 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import jwt_decode from 'jwt-decode';
 import Video from 'react-native-video';
-import { loginUser } from '../../services/authService';
-import { COLORS, SPACING } from '../../constants/theme';
+import {loginUser} from '../../services/authService';
+import {getUserProfile} from '../../services/customerService';
+import {COLORS, SPACING} from '../../constants/theme';
 import Toast from 'react-native-toast-message';
 
-const { width, height } = Dimensions.get('window');
+const {width, height} = Dimensions.get('window');
 
 const firstValue = (...values) =>
-  values.find((v) => v !== undefined && v !== null && String(v).trim() !== '');
+  values.find(v => v !== undefined && v !== null && String(v).trim() !== '');
 
-const normalizeRole = (role) => {
-  const v = String(role || 'USER').replace(/^ROLE_/, '').toUpperCase();
-  if (v === 'ADMIN') return 'ADMIN';
-  if (v === 'DEALER') return 'DEALER';
+const normalizeRole = role => {
+  const v = String(role || 'USER')
+    .replace(/^ROLE_/, '')
+    .toUpperCase();
+  if (v === 'ADMIN') {
+    return 'ADMIN';
+  }
+  if (v === 'DEALER') {
+    return 'DEALER';
+  }
   return 'USER';
 };
 
-const getLoginData = (response) => {
+const getLoginData = response => {
   const data = response?.data?.data || response?.data || response || {};
-  const nested = data.user || data.admin || data.dealer || data.customer || data.profile || {};
-  return { ...data, ...nested };
+  const nested =
+    data.user ||
+    data.admin ||
+    data.dealer ||
+    data.customer ||
+    data.profile ||
+    {};
+  return {...data, ...nested};
 };
 
 const clearStoredSession = async () => {
@@ -882,7 +895,7 @@ const clearStoredSession = async () => {
   ]);
 };
 
-const LoginScreen = ({ navigation }) => {
+const LoginScreen = ({navigation}) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -890,7 +903,7 @@ const LoginScreen = ({ navigation }) => {
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Toast.show({ type: 'error', text1: 'Please fill all fields' });
+      Toast.show({type: 'error', text1: 'Please fill all fields'});
       return;
     }
 
@@ -900,12 +913,15 @@ const LoginScreen = ({ navigation }) => {
 
       let res;
       try {
-        res = await loginUser({ email, password });
+        res = await loginUser({email, password});
       } catch (err) {
         if (err?.response?.status === 403) {
           await clearStoredSession();
-          Toast.show({ type: 'error', text1: 'Session expired. Please login again' });
-          navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+          Toast.show({
+            type: 'error',
+            text1: 'Session expired. Please login again',
+          });
+          navigation.reset({index: 0, routes: [{name: 'Login'}]});
           return;
         }
 
@@ -917,10 +933,15 @@ const LoginScreen = ({ navigation }) => {
       }
 
       const body = getLoginData(res);
-      const token = firstValue(body?.token, res?.token, res?.data?.token, res?.data?.data?.token);
+      const token = firstValue(
+        body?.token,
+        res?.token,
+        res?.data?.token,
+        res?.data?.data?.token,
+      );
 
       if (!token) {
-        Toast.show({ type: 'error', text1: 'Token not found in response' });
+        Toast.show({type: 'error', text1: 'Token not found in response'});
         return;
       }
 
@@ -942,12 +963,23 @@ const LoginScreen = ({ navigation }) => {
 
       const userObject = {
         id: id || null,
-        name: firstValue(body?.fullName, body?.name, decoded?.fullName, decoded?.name, email),
+        name: firstValue(
+          body?.fullName,
+          body?.name,
+          decoded?.fullName,
+          decoded?.name,
+          email,
+        ),
         email: firstValue(body?.email, decoded?.email, decoded?.sub, email),
         role,
         dealerId:
           role === 'DEALER'
-            ? firstValue(body?.dealerId, body?.id, decoded?.dealerId, decoded?.id)
+            ? firstValue(
+                body?.dealerId,
+                body?.id,
+                decoded?.dealerId,
+                decoded?.id,
+              )
             : firstValue(body?.dealerId, decoded?.dealerId, null),
         dealerCode: firstValue(body?.dealerCode, decoded?.dealerCode, null),
         token,
@@ -958,19 +990,51 @@ const LoginScreen = ({ navigation }) => {
 
       if (role === 'ADMIN') {
         await AsyncStorage.setItem('adminData', JSON.stringify(userObject));
-        Toast.show({ type: 'success', text1: 'Admin Login Successful' });
-        navigation.reset({ index: 0, routes: [{ name: 'AdminDashboard' }] });
+        Toast.show({type: 'success', text1: 'Admin Login Successful'});
+        navigation.reset({index: 0, routes: [{name: 'AdminDashboard'}]});
       } else if (role === 'DEALER') {
         await AsyncStorage.setItem('dealerData', JSON.stringify(userObject));
         if (userObject.dealerCode) {
           await AsyncStorage.setItem('dealerCode', userObject.dealerCode);
         }
-        Toast.show({ type: 'success', text1: 'Dealer Login Successful' });
-        navigation.reset({ index: 0, routes: [{ name: 'DealerDashboard' }] });
+        Toast.show({type: 'success', text1: 'Dealer Login Successful'});
+        navigation.reset({index: 0, routes: [{name: 'DealerDashboard'}]});
       } else {
         await AsyncStorage.setItem('userData', JSON.stringify(userObject));
-        Toast.show({ type: 'success', text1: 'Login Successful' });
-        navigation.reset({ index: 0, routes: [{ name: 'CustomerDashboard' }] });
+
+        try {
+          const profile = await getUserProfile(id);
+          const regType = String(profile?.registrationType || '')
+            .toUpperCase()
+            .trim();
+          const isPaid =
+            profile?.paymentDone === true ||
+            String(profile?.paymentStatus || '')
+              .toUpperCase()
+              .trim() === 'SUCCESS';
+
+          Toast.show({type: 'success', text1: 'Login Successful'});
+
+          if (regType === 'INDIVIDUAL' && !isPaid) {
+            navigation.reset({
+              index: 0,
+              routes: [
+                {
+                  name: 'Payment',
+                  params: {userId: id, applicationNumber: `USER-${id}`},
+                },
+              ],
+            });
+          } else {
+            // DEALER or already paid INDIVIDUAL users continue directly to dashboard
+            navigation.reset({index: 0, routes: [{name: 'CustomerDashboard'}]});
+          }
+        } catch (fetchErr) {
+          console.log('LOGIN PROFILE FETCH ERROR =>', fetchErr);
+          // Fallback to customer dashboard if fetch fails
+          Toast.show({type: 'success', text1: 'Login Successful'});
+          navigation.reset({index: 0, routes: [{name: 'CustomerDashboard'}]});
+        }
       }
     } catch (err) {
       Toast.show({
@@ -984,7 +1048,11 @@ const LoginScreen = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
-      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+      <StatusBar
+        translucent
+        backgroundColor="transparent"
+        barStyle="light-content"
+      />
 
       {/* <Video
         source={require('../../assets/videos/login-bg.mp4')}
@@ -1002,31 +1070,29 @@ const LoginScreen = ({ navigation }) => {
       /> */}
 
       <Video
-  source={require('../../assets/videos/login-bg.mp4')}
-  style={styles.bgVideo}
-  resizeMode="cover"
-  repeat={true}
-  muted={true}
-  paused={false}
-  rate={1}
-  controls={false}
-  posterResizeMode="cover"
-  onLoad={() => console.log('VIDEO LOADED')}
-  //onProgress={() => console.log('VIDEO PLAYING')}
-  onError={(e) => console.log('VIDEO ERROR => ', e)}
-/>
+        source={require('../../assets/videos/login-bg.mp4')}
+        style={styles.bgVideo}
+        resizeMode="cover"
+        repeat={true}
+        muted={true}
+        paused={false}
+        rate={1}
+        controls={false}
+        posterResizeMode="cover"
+        onLoad={() => console.log('VIDEO LOADED')}
+        //onProgress={() => console.log('VIDEO PLAYING')}
+        onError={e => console.log('VIDEO ERROR => ', e)}
+      />
 
       <View pointerEvents="none" style={styles.overlay} />
 
       <KeyboardAvoidingView
         style={styles.content}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
+          showsVerticalScrollIndicator={false}>
           <View style={styles.header}>
             <Text style={styles.brandName}>
               Vahan <Text style={styles.brandAccent}>Finserv</Text>
@@ -1039,10 +1105,12 @@ const LoginScreen = ({ navigation }) => {
               <Text style={styles.heroAccent}>Finance Your Journey</Text>
             </Text>
 
-            <Text style={styles.heroSubtitle}>Fast • Secure • Trusted Car Loan</Text>
+            <Text style={styles.heroSubtitle}>
+              Fast • Secure • Trusted Car Loan
+            </Text>
 
             <View style={styles.featureRow}>
-              {['Car Loan', 'Quick Approval', 'Minimal Docs'].map((label) => (
+              {['Car Loan', 'Quick Approval', 'Minimal Docs'].map(label => (
                 <View key={label} style={styles.featureChip}>
                   <Text style={styles.featureChipText}>{label}</Text>
                 </View>
@@ -1051,13 +1119,13 @@ const LoginScreen = ({ navigation }) => {
           </View>
 
           <View style={styles.card}>
-             <View
-    pointerEvents="none"
-    style={{
-      ...StyleSheet.absoluteFillObject,
-      backgroundColor: 'rgba(255,255,255,0.05)',
-    }}
-  />
+            <View
+              pointerEvents="none"
+              style={{
+                ...StyleSheet.absoluteFillObject,
+                backgroundColor: 'rgba(255,255,255,0.05)',
+              }}
+            />
             <Text style={styles.cardTitle}>Welcome Back 👋</Text>
             <Text style={styles.cardSubtitle}>Sign in to continue</Text>
             <View style={styles.divider} />
@@ -1088,20 +1156,22 @@ const LoginScreen = ({ navigation }) => {
                 onChangeText={setPassword}
               />
 
-              <TouchableOpacity onPress={() => setShowPassword((p) => !p)} style={styles.eyeBtn}>
+              <TouchableOpacity
+                onPress={() => setShowPassword(p => !p)}
+                style={styles.eyeBtn}>
                 <Text style={styles.eyeText}>{showPassword ? '🙈' : '👁️'}</Text>
               </TouchableOpacity>
             </View>
 
-            <TouchableOpacity onPress={() => navigation.navigate('ForgotPassword')}>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('ForgotPassword')}>
               <Text style={styles.forgotLink}>Forgot Password?</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={[styles.submitBtn, loading && styles.submitBtnDisabled]}
               onPress={handleLogin}
-              disabled={loading}
-            >
+              disabled={loading}>
               {loading ? (
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
@@ -1117,8 +1187,10 @@ const LoginScreen = ({ navigation }) => {
             </View>
 
             <View style={styles.trustRow}>
-              {['🔒 Secure', '🛡️ RBI Compliant', '👥 Trusted'].map((t) => (
-                <Text key={t} style={styles.trustItem}>{t}</Text>
+              {['🔒 Secure', '🛡️ RBI Compliant', '👥 Trusted'].map(t => (
+                <Text key={t} style={styles.trustItem}>
+                  {t}
+                </Text>
               ))}
             </View>
           </View>
@@ -1240,24 +1312,22 @@ const styles = StyleSheet.create({
   //   paddingBottom: 26,
   //   minHeight: 430,
   // },
-card: {
-  backgroundColor: 'rgba(255,255,255,0.08)',
-  borderWidth: 1.5,
-  borderColor: 'rgba(255,255,255,0.85)',
+  card: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.85)',
 
-  borderRadius: 30,
+    borderRadius: 30,
 
-  marginHorizontal: 20,
-  marginBottom: 20,
+    marginHorizontal: 20,
+    marginBottom: 20,
 
-  paddingHorizontal: SPACING.lg,
-  paddingTop: 35,
-  paddingBottom: 30,
+    paddingHorizontal: SPACING.lg,
+    paddingTop: 35,
+    paddingBottom: 30,
 
-  overflow: 'hidden',
-},
-
-
+    overflow: 'hidden',
+  },
 
   // cardTitle: {
   //   fontSize: 25,
@@ -1265,12 +1335,12 @@ card: {
   //   color: '#061B3A',
   //   textAlign: 'center',
   // },
-cardTitle: {
-  fontSize: 25,
-  fontWeight: '900',
-  color: '#FFFFFF',
-  textAlign: 'center',
-},
+  cardTitle: {
+    fontSize: 25,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    textAlign: 'center',
+  },
   // cardSubtitle: {
   //   fontSize: 15,
   //   color: '#7E8794',
@@ -1279,11 +1349,11 @@ cardTitle: {
   // },
 
   cardSubtitle: {
-  fontSize: 15,
-  color: 'rgba(255,255,255,0.85)',
-  textAlign: 'center',
-  marginTop: 8,
-},
+    fontSize: 15,
+    color: 'rgba(255,255,255,0.85)',
+    textAlign: 'center',
+    marginTop: 8,
+  },
 
   divider: {
     width: 44,
@@ -1295,13 +1365,13 @@ cardTitle: {
     marginBottom: 32,
   },
 
- label: {
-  fontSize: 15,
-  fontWeight: '800',
-  color: '#FFFFFF',
-  marginBottom: 10,
-  marginTop: 12,
-},
+  label: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    marginBottom: 10,
+    marginTop: 12,
+  },
 
   // inputWrap: {
   //   flexDirection: 'row',
@@ -1313,27 +1383,27 @@ cardTitle: {
   //   paddingHorizontal: 16,
   //   height: 56,
   // },
-inputWrap: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  borderWidth: 1,
-  borderColor: 'rgba(255,255,255,0.70)',
-  backgroundColor: 'rgba(255,255,255,0.10)',
-  borderRadius: 12,
-  paddingHorizontal: 16,
-  height: 56,
-},
+  inputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.70)',
+    backgroundColor: 'rgba(255,255,255,0.10)',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    height: 56,
+  },
   // input: {
   //   flex: 1,
   //   color: '#061B3A',
   //   fontSize: 15,
   //   fontWeight: '500',
   // },
-input: {
-  flex: 1,
-  color: '#FFFFFF',
-  fontSize: 15,
-},
+  input: {
+    flex: 1,
+    color: '#FFFFFF',
+    fontSize: 15,
+  },
   eyeBtn: {
     paddingLeft: 10,
     paddingVertical: 6,
@@ -1350,13 +1420,13 @@ input: {
   //   textAlign: 'right',
   //   marginTop: 12,
   // },
-forgotLink: {
-  color: '#19C7BE',
-  fontSize: 14,
-  fontWeight: '600',
-  textAlign: 'right',
-  marginTop: 12,
-},
+  forgotLink: {
+    color: '#19C7BE',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'right',
+    marginTop: 12,
+  },
   submitBtn: {
     height: 58,
     borderRadius: 10,
@@ -1392,16 +1462,16 @@ forgotLink: {
   //   fontSize: 15,
   //   fontWeight: '700',
   // },
-registerText: {
-  color: '#FFFFFF',
-  fontSize: 15,
-},
+  registerText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+  },
 
-registerLink: {
-  color: '#19C7BE',
-  fontSize: 15,
-  fontWeight: '700',
-},
+  registerLink: {
+    color: '#19C7BE',
+    fontSize: 15,
+    fontWeight: '700',
+  },
   // trustRow: {
   //   flexDirection: 'row',
   //   justifyContent: 'space-around',
@@ -1410,24 +1480,24 @@ registerLink: {
   //   borderTopWidth: 1,
   //   borderTopColor: '#E4E7EC',
   // },
-trustRow: {
-  flexDirection: 'row',
-  justifyContent: 'space-around',
-  marginTop: 34,
-  paddingTop: 22,
-  borderTopWidth: 1,
-  borderTopColor: 'rgba(255,255,255,0.25)',
-},
+  trustRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: 34,
+    paddingTop: 22,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.25)',
+  },
   // trustItem: {
   //   fontSize: 12,
   //   color: '#061B3A',
   //   fontWeight: '600',
   // },
   trustItem: {
-  fontSize: 12,
-  color: '#FFFFFF',
-  fontWeight: '600',
-},
+    fontSize: 12,
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
 });
 
 export default LoginScreen;

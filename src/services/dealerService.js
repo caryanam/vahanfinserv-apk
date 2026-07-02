@@ -33,6 +33,20 @@ export const dealerVerifyOtp = async (dto) => {
   return response.data;
 };
 
+export const dealerSendRegisterOtp = async (email) => {
+  console.log('[Dealer] Sending registration OTP to:', email);
+  const response = await api.post(`/dealer/register/send-otp?email=${encodeURIComponent(email)}`, null, {
+    skipAuth: true,
+  });
+  return response.data;
+};
+
+export const dealerRegisterVerifyOtp = async (dto) => {
+  console.log('[Dealer] Verifying registration OTP');
+  const response = await api.post('/dealer/register/verify-otp', dto, { skipAuth: true });
+  return response.data;
+};
+
 export const dealerResetPassword = async (dto) => {
   console.log('[Dealer] Resetting password');
   const response = await api.post('/dealer/reset-password', dto, { skipAuth: true });

@@ -1,33 +1,53 @@
-import React, { useEffect, useState } from 'react';
+import React, {useEffect, useState} from 'react';
 import {
-  View, Text, StyleSheet, SafeAreaView, ScrollView,
-  TouchableOpacity, ActivityIndicator, Image, Modal,
+  View,
+  Text,
+  StyleSheet,
+  SafeAreaView,
+  ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
+  Image,
+  Modal,
   Linking,
 } from 'react-native';
 import api from '../../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Toast from 'react-native-toast-message';
-import { COLORS, SPACING, RADIUS } from '../../constants/theme';
+import {COLORS, SPACING, RADIUS} from '../../constants/theme';
 
 const DOC_SECTIONS = [
   {
     title: 'KYC Documents',
     icon: '🪪',
-    types: ['AADHAAR', 'PAN'],
-    labels: { AADHAAR: 'Aadhaar Card', PAN: 'PAN Card' },
+    types: ['AADHAAR_1', 'AADHAAR_2', 'PAN'],
+    labels: {
+      AADHAAR_1: 'Aadhaar Front Side',
+      AADHAAR_2: 'Aadhaar Back Side',
+      PAN: 'PAN Card',
+    },
   },
   {
     title: 'Residential Documents',
     icon: '🏠',
     types: ['LIGHT_BILL', 'RENTAL_AGREEMENT'],
-    labels: { LIGHT_BILL: 'Light Bill', RENTAL_AGREEMENT: 'Rental Agreement' },
+    labels: {LIGHT_BILL: 'Light Bill', RENTAL_AGREEMENT: 'Rental Agreement'},
   },
   {
     title: 'Income Documents',
     icon: '💼',
-    types: ['SALARY_SLIP', 'APPOINTMENT_LETTER', 'BANK_STATEMENT', 'ITR_RETURN'],
+    types: [
+      'SALARY_SLIP_1',
+      'SALARY_SLIP_2',
+      'SALARY_SLIP_3',
+      'APPOINTMENT_LETTER',
+      'BANK_STATEMENT',
+      'ITR_RETURN',
+    ],
     labels: {
-      SALARY_SLIP: 'Salary Slip',
+      SALARY_SLIP_1: 'Salary Slip Month 1',
+      SALARY_SLIP_2: 'Salary Slip Month 2',
+      SALARY_SLIP_3: 'Salary Slip Month 3',
       APPOINTMENT_LETTER: 'Appointment Letter',
       BANK_STATEMENT: 'Bank Statement',
       ITR_RETURN: 'ITR Return',
@@ -37,14 +57,18 @@ const DOC_SECTIONS = [
     title: 'Vehicle Documents',
     icon: '🚗',
     types: [
-      'RC', 'INSURANCE', 'VEHICLE_INVOICE', 'VEHICLE_PHOTO',
-      'ODOMETER_READING', 'CHASSIS_NUMBER', 'CAR_FRONT_SIDE_PHOTO', 'CAR_BACK_SIDE_PHOTO',
+      'RC_1',
+      'RC_2',
+      'INSURANCE',
+      'ODOMETER_READING',
+      'CHASSIS_NUMBER',
+      'CAR_FRONT_SIDE_PHOTO',
+      'CAR_BACK_SIDE_PHOTO',
     ],
     labels: {
-      RC: 'RC',
+      RC_1: 'RC Front Side',
+      RC_2: 'RC Back Side',
       INSURANCE: 'Insurance',
-      VEHICLE_INVOICE: 'Vehicle Invoice',
-      VEHICLE_PHOTO: 'Vehicle Photo',
       ODOMETER_READING: 'Odometer Reading',
       CHASSIS_NUMBER: 'Chassis Number',
       CAR_FRONT_SIDE_PHOTO: 'Car Front Side Photo',
@@ -53,10 +77,16 @@ const DOC_SECTIONS = [
   },
 ];
 
-const isPdf = (fileName) => fileName?.toLowerCase().endsWith('.pdf');
+const isPdf = fileName => fileName?.toLowerCase().endsWith('.pdf');
 
-const VerifySubmitScreen = ({ navigation, route }) => {
-  const { applicationNumber, userId, loanNumber, applicationNo, loanApplicationNumber } = route.params || {};
+const VerifySubmitScreen = ({navigation, route}) => {
+  const {
+    applicationNumber,
+    userId,
+    loanNumber,
+    applicationNo,
+    loanApplicationNumber,
+  } = route.params || {};
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [user, setUser] = useState(null);
@@ -65,6 +95,7 @@ const VerifySubmitScreen = ({ navigation, route }) => {
 
   useEffect(() => {
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchData = async () => {
@@ -86,9 +117,9 @@ const VerifySubmitScreen = ({ navigation, route }) => {
     }
   };
 
-  const openPreview = async (doc) => {
+  const openPreview = async doc => {
     const documentId = doc.id || doc.documentId;
-    const fileName   = doc.fileName || doc.documentName || '';
+    const fileName = doc.fileName || doc.documentName || '';
     const previewUrl = `${api.defaults.baseURL}/documents/preview/${documentId}`;
 
     console.log('PREVIEW URL =>', previewUrl);
@@ -96,7 +127,7 @@ const VerifySubmitScreen = ({ navigation, route }) => {
 
     if (isPdf(fileName)) {
       Linking.openURL(previewUrl).catch(() =>
-        Toast.show({ type: 'error', text1: 'Unable to load preview' })
+        Toast.show({type: 'error', text1: 'Unable to load preview'}),
       );
       return;
     }
@@ -105,18 +136,18 @@ const VerifySubmitScreen = ({ navigation, route }) => {
     try {
       const token = await AsyncStorage.getItem('token');
       const res = await fetch(previewUrl, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        headers: token ? {Authorization: `Bearer ${token}`} : {},
       });
       if (!res.ok) {
-        Toast.show({ type: 'error', text1: 'Unable to load preview' });
+        Toast.show({type: 'error', text1: 'Unable to load preview'});
         return;
       }
     } catch {
-      Toast.show({ type: 'error', text1: 'Unable to load preview' });
+      Toast.show({type: 'error', text1: 'Unable to load preview'});
       return;
     }
 
-    setPreview({ url: previewUrl, fileName });
+    setPreview({url: previewUrl, fileName});
   };
 
   const submitApplication = async () => {
@@ -126,8 +157,35 @@ const VerifySubmitScreen = ({ navigation, route }) => {
     } catch {
       // endpoint may not exist — proceed anyway
     }
-    Toast.show({ type: 'success', text1: 'Application verified successfully' });
-    navigation.navigate('Payment', { applicationNumber, userId });
+    Toast.show({type: 'success', text1: 'Application verified successfully'});
+
+    try {
+      const response = await api.get(`/user/${userId}`);
+      const profile = response.data?.data || response.data || {};
+      const regType = String(profile?.registrationType || '')
+        .toUpperCase()
+        .trim();
+      const isDealerCreated = Boolean(
+        profile?.dealerId ||
+          profile?.assignedDealerId ||
+          profile?.dealer?.id ||
+          profile?.dealerCode,
+      );
+
+      if (regType === 'DEALER' || isDealerCreated) {
+        console.log('SKIPPING PAYMENT FOR DEALER/DEALER-CREATED CUSTOMER...');
+        navigation.reset({
+          index: 0,
+          routes: [{name: 'CustomerDashboard'}],
+        });
+      } else {
+        navigation.navigate('Payment', {applicationNumber, userId});
+      }
+    } catch (err) {
+      console.log('VERIFY SUBMIT SCREEN PROFILE FETCH ERROR =>', err);
+      // Fallback
+      navigation.navigate('Payment', {applicationNumber, userId});
+    }
     setSubmitting(false);
   };
 
@@ -136,7 +194,7 @@ const VerifySubmitScreen = ({ navigation, route }) => {
     return acc;
   }, {});
 
-  const InfoRow = ({ label, value }) =>
+  const InfoRow = ({label, value}) =>
     value ? (
       <View style={styles.infoRow}>
         <Text style={styles.infoLabel}>{label}</Text>
@@ -144,7 +202,7 @@ const VerifySubmitScreen = ({ navigation, route }) => {
       </View>
     ) : null;
 
-  const DocCard = ({ label, doc }) => (
+  const DocCard = ({label, doc}) => (
     <View style={styles.docCard}>
       <View style={styles.docCardLeft}>
         <Text style={styles.docLabel}>{label}</Text>
@@ -164,7 +222,9 @@ const VerifySubmitScreen = ({ navigation, route }) => {
         )}
       </View>
       {doc && (
-        <TouchableOpacity style={styles.previewBtn} onPress={() => openPreview(doc)}>
+        <TouchableOpacity
+          style={styles.previewBtn}
+          onPress={() => openPreview(doc)}>
           <Text style={styles.previewBtnText}>Preview</Text>
         </TouchableOpacity>
       )}
@@ -173,44 +233,63 @@ const VerifySubmitScreen = ({ navigation, route }) => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled">
         <View style={styles.headerBadge}>
           <Text style={styles.headerBadgeText}>FINAL STEP</Text>
         </View>
         <Text style={styles.title}>Verify & Submit</Text>
         <Text style={styles.subtitle}>
-          Application No: {applicationNumber || loanNumber || applicationNo || loanApplicationNumber || '—'}
+          Application No:{' '}
+          {applicationNumber ||
+            loanNumber ||
+            applicationNo ||
+            loanApplicationNumber ||
+            '—'}
         </Text>
 
         {loading ? (
-          <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: 40 }} />
+          <ActivityIndicator
+            size="large"
+            color={COLORS.primary}
+            style={{marginTop: 40}}
+          />
         ) : (
           <>
             {/* User Information */}
             <View style={styles.card}>
-              <Text style={styles.sectionTitle}>👤  User Information</Text>
-              <InfoRow label="Full Name"     value={user?.fullName || user?.name} />
-              <InfoRow label="Email"         value={user?.email} />
-              <InfoRow label="Mobile Number" value={user?.mobileNumber || user?.phone} />
-              <InfoRow label="Role"          value={user?.role} />
-              <InfoRow label="User ID"       value={String(userId || '')} />
+              <Text style={styles.sectionTitle}>👤 User Information</Text>
+              <InfoRow label="Full Name" value={user?.fullName || user?.name} />
+              <InfoRow label="Email" value={user?.email} />
+              <InfoRow
+                label="Mobile Number"
+                value={user?.mobileNumber || user?.phone}
+              />
+              <InfoRow label="Role" value={user?.role} />
+              <InfoRow label="User ID" value={String(userId || '')} />
             </View>
 
             {/* Personal Information */}
             <View style={styles.card}>
-              <Text style={styles.sectionTitle}>📋  Personal Information</Text>
-              <InfoRow label="Address"     value={user?.address} />
-              <InfoRow label="City"        value={user?.city} />
-              <InfoRow label="State"       value={user?.state} />
-              <InfoRow label="Pincode"     value={user?.pincode} />
-              <InfoRow label="Loan Amount" value={user?.loanAmount ? `₹ ${user.loanAmount}` : null} />
+              <Text style={styles.sectionTitle}>📋 Personal Information</Text>
+              <InfoRow label="Address" value={user?.address} />
+              <InfoRow label="City" value={user?.city} />
+              <InfoRow label="State" value={user?.state} />
+              <InfoRow label="Pincode" value={user?.pincode} />
+              <InfoRow
+                label="Loan Amount"
+                value={user?.loanAmount ? `₹ ${user.loanAmount}` : null}
+              />
             </View>
 
             {/* Document Sections */}
-            {DOC_SECTIONS.map((section) => (
+            {DOC_SECTIONS.map(section => (
               <View key={section.title} style={styles.card}>
-                <Text style={styles.sectionTitle}>{section.icon}  {section.title}</Text>
-                {section.types.map((type) => (
+                <Text style={styles.sectionTitle}>
+                  {section.icon} {section.title}
+                </Text>
+                {section.types.map(type => (
                   <DocCard
                     key={type}
                     label={section.labels[type]}
@@ -221,10 +300,12 @@ const VerifySubmitScreen = ({ navigation, route }) => {
             ))}
 
             <TouchableOpacity
-              style={[styles.primaryBtn, submitting && styles.primaryBtnDisabled]}
+              style={[
+                styles.primaryBtn,
+                submitting && styles.primaryBtnDisabled,
+              ]}
               onPress={submitApplication}
-              disabled={submitting}
-            >
+              disabled={submitting}>
               {submitting ? (
                 <ActivityIndicator color={COLORS.white} />
               ) : (
@@ -232,7 +313,9 @@ const VerifySubmitScreen = ({ navigation, route }) => {
               )}
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+            <TouchableOpacity
+              style={styles.backBtn}
+              onPress={() => navigation.goBack()}>
               <Text style={styles.backBtnText}>← Previous</Text>
             </TouchableOpacity>
           </>
@@ -243,20 +326,20 @@ const VerifySubmitScreen = ({ navigation, route }) => {
       <Modal
         visible={!!preview}
         animationType="slide"
-        onRequestClose={() => setPreview(null)}
-      >
-        <View style={{ flex: 1, backgroundColor: '#000' }}>
+        onRequestClose={() => setPreview(null)}>
+        <View style={{flex: 1, backgroundColor: '#000'}}>
           <TouchableOpacity
             onPress={() => setPreview(null)}
-            style={{ padding: 20 }}
-          >
-            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 16 }}>✕  Close</Text>
+            style={{padding: 20}}>
+            <Text style={{color: '#fff', fontWeight: '700', fontSize: 16}}>
+              ✕ Close
+            </Text>
           </TouchableOpacity>
           {preview?.url && (
             <Image
-              source={{ uri: preview.url }}
+              source={{uri: preview.url}}
               resizeMode="contain"
-              style={{ width: '100%', height: '90%' }}
+              style={{width: '100%', height: '90%'}}
             />
           )}
         </View>
@@ -268,7 +351,7 @@ const VerifySubmitScreen = ({ navigation, route }) => {
 export default VerifySubmitScreen;
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: COLORS.background },
+  safeArea: {flex: 1, backgroundColor: COLORS.background},
 
   container: {
     padding: SPACING.md,
@@ -308,7 +391,7 @@ const styles = StyleSheet.create({
     padding: SPACING.lg,
     marginBottom: SPACING.md,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: {width: 0, height: 1},
     shadowOpacity: 0.06,
     shadowRadius: 4,
     elevation: 2,
@@ -350,7 +433,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
   },
-  docCardLeft: { flex: 1, marginRight: SPACING.sm },
+  docCardLeft: {flex: 1, marginRight: SPACING.sm},
   docLabel: {
     fontSize: 13,
     fontWeight: '700',
@@ -399,10 +482,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: SPACING.sm,
   },
-  primaryBtnDisabled: { opacity: 0.7 },
-  primaryBtnText: { color: COLORS.white, fontWeight: '800', fontSize: 15 },
+  primaryBtnDisabled: {opacity: 0.7},
+  primaryBtnText: {color: COLORS.white, fontWeight: '800', fontSize: 15},
 
-  backBtn: { padding: 14, alignItems: 'center' },
-  backBtnText: { color: COLORS.primary, fontWeight: '700', fontSize: 14 },
-
+  backBtn: {padding: 14, alignItems: 'center'},
+  backBtnText: {color: COLORS.primary, fontWeight: '700', fontSize: 14},
 });

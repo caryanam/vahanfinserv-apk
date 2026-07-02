@@ -275,8 +275,10 @@ import {
   TouchableOpacity, ScrollView, ActivityIndicator,
 } from 'react-native';
 import DocumentPicker from 'react-native-document-picker';
+import { launchCamera } from 'react-native-image-picker';
 import api from '../../services/api';
 import Toast from 'react-native-toast-message';
+import { sanitizeFileName } from '../../services/fileUtils';
 import { COLORS, SPACING, RADIUS } from '../../constants/theme';
 
 const ALLOWED_TYPES = [DocumentPicker.types.images, DocumentPicker.types.pdf];
@@ -300,13 +302,48 @@ const ResidentialInfoScreen = ({ navigation, route }) => {
 
       setFile({
         uri: result.fileCopyUri || result.uri,
-        name: result.name || `document_${Date.now()}`,
+        name: sanitizeFileName(result.name, 'document'),
         type: result.type || 'application/octet-stream',
       });
     } catch (err) {
       if (!DocumentPicker.isCancel(err)) {
         Toast.show({ type: 'error', text1: 'Could not open file picker' });
       }
+    }
+  };
+
+  const captureFromCamera = async (setFile) => {
+    try {
+      const result = await launchCamera({
+        mediaType: 'photo',
+        quality: 0.8,
+        maxWidth: 1920,
+        maxHeight: 1920,
+        saveToPhotos: false,
+      });
+
+      if (result.didCancel) return;
+
+      if (result.errorCode) {
+        Toast.show({
+          type: 'error',
+          text1: result.errorCode === 'camera_unavailable'
+            ? 'Camera not available'
+            : result.errorMessage || 'Camera error',
+        });
+        return;
+      }
+
+      const asset = result.assets?.[0];
+      if (asset) {
+        setFile({
+          uri: asset.uri,
+          name: sanitizeFileName(asset.fileName, 'document'),
+          type: asset.type || 'image/jpeg',
+        });
+      }
+    } catch (err) {
+      Toast.show({ type: 'error', text1: 'Could not open camera' });
     }
   };
 
@@ -317,7 +354,7 @@ const ResidentialInfoScreen = ({ navigation, route }) => {
     formData.append('type', type);
     formData.append('file', {
       uri: file.uri,
-      name: file.name || `${type}.jpg`,
+      name: sanitizeFileName(file.name, type),
       type: file.type || 'image/jpeg',
     });
 
@@ -418,16 +455,29 @@ const ResidentialInfoScreen = ({ navigation, route }) => {
               <Text style={styles.fileIcon}>📄</Text>
               <Text style={styles.fileName} numberOfLines={1}>{file.name}</Text>
             </View>
-            <TouchableOpacity onPress={() => pickFile(setFile)} style={styles.replaceBtn}>
-              <Text style={styles.replaceBtnText}>Replace</Text>
-            </TouchableOpacity>
+            <View style={styles.replaceActions}>
+              <TouchableOpacity onPress={() => captureFromCamera(setFile)} style={styles.replaceCameraBtn}>
+                <Text style={styles.replaceBtnText}>📷</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => pickFile(setFile)} style={styles.replaceBtn}>
+                <Text style={styles.replaceBtnText}>Replace</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         ) : (
-          <TouchableOpacity style={styles.uploadBox} onPress={() => pickFile(setFile)}>
+          <View style={styles.uploadBox}>
             <Text style={styles.uploadBoxIcon}>⬆️</Text>
-            <Text style={styles.uploadBoxText}>Tap to upload</Text>
+            <Text style={styles.uploadBoxText}>Upload Document</Text>
             <Text style={styles.uploadBoxHint}>JPG, PNG or PDF</Text>
-          </TouchableOpacity>
+            <View style={styles.uploadActions}>
+              <TouchableOpacity style={styles.cameraBtn} onPress={() => captureFromCamera(setFile)}>
+                <Text style={styles.cameraBtnText}>📷 Camera</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.galleryBtn} onPress={() => pickFile(setFile)}>
+                <Text style={styles.galleryBtnText}>📁 Gallery / Files</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         )}
       </View>
     );
@@ -621,6 +671,48 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.sm,
   },
   replaceBtnText: { fontSize: 12, fontWeight: '700', color: COLORS.primary },
+
+  replaceActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  replaceCameraBtn: {
+    backgroundColor: COLORS.accent + '22',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: RADIUS.sm,
+  },
+
+  uploadActions: {
+    flexDirection: 'row',
+    marginTop: SPACING.sm,
+    gap: SPACING.sm,
+  },
+  cameraBtn: {
+    flex: 1,
+    backgroundColor: COLORS.primary,
+    paddingVertical: 10,
+    borderRadius: RADIUS.sm,
+    alignItems: 'center',
+  },
+  cameraBtnText: {
+    color: COLORS.white,
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  galleryBtn: {
+    flex: 1,
+    backgroundColor: COLORS.accent + '22',
+    paddingVertical: 10,
+    borderRadius: RADIUS.sm,
+    alignItems: 'center',
+  },
+  galleryBtnText: {
+    color: COLORS.primary,
+    fontWeight: '700',
+    fontSize: 13,
+  },
 
   primaryBtn: {
     backgroundColor: COLORS.primary,
