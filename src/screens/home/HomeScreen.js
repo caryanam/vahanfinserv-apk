@@ -1,709 +1,4 @@
-// import React, { useRef, useState } from 'react';
-// import {
-//   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-//   Dimensions, StatusBar, SafeAreaView, Image,
-// } from 'react-native';
-// import hero-car from "../../assets/videos/hero-car-video.mp4";
-// import { COLORS, SPACING, RADIUS } from '../../constants/theme';
-
-// const { width: W, height: H } = Dimensions.get('window');
-
-// // ─── Data ─────────────────────────────────────────────────────────────────────
-
-// const SERVICES = [
-//   { icon: '🚗', title: 'New Car Loan',        desc: 'Finance your dream car with competitive interest rates and flexible tenure.' },
-//   { icon: '🔄', title: 'Used Car Loan',        desc: 'Get funds for pre-owned vehicles with minimal documentation.' },
-//   { icon: '🏍️', title: 'Two-Wheeler Loan',    desc: 'Affordable loans for bikes and scooters across all top brands.' },
-//   { icon: '🚐', title: 'Commercial Vehicle',   desc: 'Fleet financing solutions for trucks, buses, and commercial vans.' },
-//   { icon: '💳', title: 'Loan Against Vehicle', desc: 'Unlock the value of your existing vehicle with instant funds.' },
-//   { icon: '🔁', title: 'Refinancing',          desc: 'Transfer your existing vehicle loan to us and save on EMIs.' },
-// ];
-
-// const WHY_US = [
-//   { icon: '⚡', title: 'Quick Approval',     desc: 'Get loan approval within 24 hours of document submission.' },
-//   { icon: '📄', title: 'Minimal Docs',       desc: 'Simple documentation process — KYC, income proof, and vehicle details.' },
-//   { icon: '💰', title: 'Best Rates',         desc: 'Competitive interest rates starting from 9.5% per annum.' },
-//   { icon: '🤝', title: 'Trusted Partners',   desc: 'Tied up with 20+ banks and NBFCs for the best loan offers.' },
-//   { icon: '📱', title: 'Digital Process',    desc: 'Apply, upload documents, and track status entirely online.' },
-//   { icon: '🛡️', title: 'Secure & Reliable', desc: 'RBI registered, fully compliant with all financial regulations.' },
-// ];
-
-// const STEPS = [
-//   { step: '01', title: 'Apply Online',      desc: 'Fill the quick application form with basic personal and vehicle details.' },
-//   { step: '02', title: 'Upload Documents',  desc: 'Submit KYC, income, and vehicle documents through our secure portal.' },
-//   { step: '03', title: 'Verification',      desc: 'Our team verifies your documents and assesses eligibility.' },
-//   { step: '04', title: 'Loan Approval',     desc: 'Receive approval notification with terms and EMI details.' },
-//   { step: '05', title: 'Disbursement',      desc: 'Funds disbursed directly to the dealer or your account within 24 hrs.' },
-// ];
-
-// const STATS = [
-//   { value: '10,000+', label: 'Happy Customers' },
-//   { value: '₹500 Cr+', label: 'Loans Disbursed' },
-//   { value: '20+',      label: 'Banking Partners' },
-//   { value: '24 Hrs',   label: 'Quick Approval' },
-// ];
-
-// // ─── Screen ───────────────────────────────────────────────────────────────────
-
-// const HomeScreen = ({ navigation }) => {
-//   const videoRef = useRef(null);
-//   const [videoError, setVideoError] = useState(false);
-
-//   return (
-//     <View style={styles.root}>
-//       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-
-//       <ScrollView
-//         style={styles.scroll}
-//         contentContainerStyle={styles.scrollContent}
-//         showsVerticalScrollIndicator={false}
-//         bounces={false}
-//       >
-//         {/* ── HERO ──────────────────────────────────────────────────────────── */}
-//         <View style={styles.hero}>
-//           {!videoError ? (
-//             <Video
-//               ref={videoRef}
-//               source={require('../../assets/videos/home-video.mp4')}
-//               style={StyleSheet.absoluteFill}
-//               resizeMode="cover"
-//               muted
-//               repeat
-//               playInBackground={false}
-//               playWhenInactive={false}
-//               ignoreSilentSwitch="obey"
-//               onError={() => setVideoError(true)}
-//             />
-//           ) : (
-//             // Fallback gradient-like dark background when video is missing
-//             <View style={[StyleSheet.absoluteFill, styles.videoFallback]} />
-//           )}
-
-//           {/* Dark overlay */}
-//           <View style={[StyleSheet.absoluteFill, styles.heroOverlay]} />
-
-//           <SafeAreaView style={styles.heroContent}>
-//             {/* Nav bar */}
-//             <View style={styles.navBar}>
-//               <Text style={styles.navLogo}>
-//                 <Text style={styles.navLogoAccent}>Vahan</Text> Finserv
-//               </Text>
-//               <TouchableOpacity
-//                 style={styles.navLoginBtn}
-//                 onPress={() => navigation.navigate('Login')}
-//               >
-//                 <Text style={styles.navLoginText}>Login</Text>
-//               </TouchableOpacity>
-//             </View>
-
-//             {/* Hero text */}
-//             <View style={styles.heroTextWrap}>
-//               <View style={styles.heroBadge}>
-//                 <Text style={styles.heroBadgeText}>🚗  Vehicle Loan Specialists</Text>
-//               </View>
-
-//               <Text style={styles.heroHeading}>
-//                 Drive Your{'\n'}
-//                 <Text style={styles.heroHeadingAccent}>Dream Vehicle</Text>
-//                 {'\n'}Today
-//               </Text>
-
-//               <Text style={styles.heroSub}>
-//                 Fast approvals, competitive rates, and a completely digital
-//                 process. Your vehicle loan is just a few taps away.
-//               </Text>
-
-//               <View style={styles.heroCtas}>
-//                 <TouchableOpacity
-//                   style={styles.ctaPrimary}
-//                   onPress={() => navigation.navigate('Register')}
-//                   activeOpacity={0.85}
-//                 >
-//                   <Text style={styles.ctaPrimaryText}>Apply Now →</Text>
-//                 </TouchableOpacity>
-
-//                 <TouchableOpacity
-//                   style={styles.ctaSecondary}
-//                   onPress={() => navigation.navigate('Login')}
-//                   activeOpacity={0.85}
-//                 >
-//                   <Text style={styles.ctaSecondaryText}>Login</Text>
-//                 </TouchableOpacity>
-//               </View>
-//             </View>
-//           </SafeAreaView>
-//         </View>
-
-//         {/* ── STATS BAR ─────────────────────────────────────────────────────── */}
-//         <View style={styles.statsBar}>
-//           {STATS.map((s, i) => (
-//             <View key={i} style={[styles.statItem, i < STATS.length - 1 && styles.statBorder]}>
-//               <Text style={styles.statValue}>{s.value}</Text>
-//               <Text style={styles.statLabel}>{s.label}</Text>
-//             </View>
-//           ))}
-//         </View>
-
-//         {/* ── ABOUT ─────────────────────────────────────────────────────────── */}
-//         <View style={styles.section}>
-//           <View style={styles.sectionBadge}>
-//             <Text style={styles.sectionBadgeText}>WHO WE ARE</Text>
-//           </View>
-//           <Text style={styles.sectionTitle}>About Vahan Finserv</Text>
-//           <Text style={styles.sectionBody}>
-//             Vahan Finserv is a leading vehicle financing company dedicated to making
-//             vehicle ownership accessible to everyone. With deep expertise in the
-//             automotive finance sector and strong partnerships with top banks and NBFCs,
-//             we deliver fast, transparent, and customer-first loan solutions.
-//           </Text>
-//           <Text style={styles.sectionBody}>
-//             Whether you're buying a new car, a used vehicle, or a two-wheeler, our team
-//             of experts guides you through every step — from application to disbursement —
-//             ensuring the best deal tailored to your needs.
-//           </Text>
-
-//           <View style={styles.aboutHighlights}>
-//             {[
-//               { icon: '🏆', text: '10+ Years of Experience' },
-//               { icon: '📍', text: 'Pan-India Presence' },
-//               { icon: '✅', text: 'RBI Compliant' },
-//               { icon: '💬', text: '24/7 Customer Support' },
-//             ].map((h, i) => (
-//               <View key={i} style={styles.aboutHighlight}>
-//                 <Text style={styles.aboutHighlightIcon}>{h.icon}</Text>
-//                 <Text style={styles.aboutHighlightText}>{h.text}</Text>
-//               </View>
-//             ))}
-//           </View>
-//         </View>
-
-//         {/* ── SERVICES ──────────────────────────────────────────────────────── */}
-//         <View style={[styles.section, styles.sectionAlt]}>
-//           <View style={styles.sectionBadge}>
-//             <Text style={styles.sectionBadgeText}>WHAT WE OFFER</Text>
-//           </View>
-//           <Text style={styles.sectionTitle}>Vehicle Loan Services</Text>
-//           <Text style={styles.sectionSubtitle}>
-//             Comprehensive vehicle financing solutions for every need and budget.
-//           </Text>
-
-//           <View style={styles.grid}>
-//             {SERVICES.map((s, i) => (
-//               <View key={i} style={styles.serviceCard}>
-//                 <Text style={styles.serviceIcon}>{s.icon}</Text>
-//                 <Text style={styles.serviceTitle}>{s.title}</Text>
-//                 <Text style={styles.serviceDesc}>{s.desc}</Text>
-//               </View>
-//             ))}
-//           </View>
-//         </View>
-
-//         {/* ── WHY CHOOSE US ─────────────────────────────────────────────────── */}
-//         <View style={styles.section}>
-//           <View style={styles.sectionBadge}>
-//             <Text style={styles.sectionBadgeText}>WHY US</Text>
-//           </View>
-//           <Text style={styles.sectionTitle}>Why Choose Vahan Finserv?</Text>
-//           <Text style={styles.sectionSubtitle}>
-//             We make vehicle financing simple, fast, and stress-free.
-//           </Text>
-
-//           {WHY_US.map((w, i) => (
-//             <View key={i} style={styles.whyRow}>
-//               <View style={styles.whyIconWrap}>
-//                 <Text style={styles.whyIcon}>{w.icon}</Text>
-//               </View>
-//               <View style={styles.whyText}>
-//                 <Text style={styles.whyTitle}>{w.title}</Text>
-//                 <Text style={styles.whyDesc}>{w.desc}</Text>
-//               </View>
-//             </View>
-//           ))}
-//         </View>
-
-//         {/* ── PROCESS STEPS ─────────────────────────────────────────────────── */}
-//         <View style={[styles.section, styles.sectionDark]}>
-//           <View style={[styles.sectionBadge, styles.sectionBadgeDark]}>
-//             <Text style={[styles.sectionBadgeText, { color: COLORS.accent }]}>HOW IT WORKS</Text>
-//           </View>
-//           <Text style={[styles.sectionTitle, { color: COLORS.white }]}>
-//             Loan Process — 5 Simple Steps
-//           </Text>
-//           <Text style={[styles.sectionSubtitle, { color: COLORS.textMuted }]}>
-//             From application to disbursement in as little as 24 hours.
-//           </Text>
-
-//           {STEPS.map((s, i) => (
-//             <View key={i} style={styles.stepRow}>
-//               <View style={styles.stepLeft}>
-//                 <View style={styles.stepCircle}>
-//                   <Text style={styles.stepNum}>{s.step}</Text>
-//                 </View>
-//                 {i < STEPS.length - 1 && <View style={styles.stepLine} />}
-//               </View>
-//               <View style={styles.stepContent}>
-//                 <Text style={styles.stepTitle}>{s.title}</Text>
-//                 <Text style={styles.stepDesc}>{s.desc}</Text>
-//               </View>
-//             </View>
-//           ))}
-//         </View>
-
-//         {/* ── CTA BANNER ────────────────────────────────────────────────────── */}
-//         <View style={styles.ctaBanner}>
-//           <Text style={styles.ctaBannerTitle}>Ready to Get Started?</Text>
-//           <Text style={styles.ctaBannerSub}>
-//             Apply in minutes. Get approved in 24 hours.{'\n'}
-//             No hidden charges. No surprises.
-//           </Text>
-//           <TouchableOpacity
-//             style={styles.ctaBannerBtn}
-//             onPress={() => navigation.navigate('Register')}
-//             activeOpacity={0.85}
-//           >
-//             <Text style={styles.ctaBannerBtnText}>Apply for a Loan →</Text>
-//           </TouchableOpacity>
-//           <TouchableOpacity
-//             style={styles.ctaBannerLoginLink}
-//             onPress={() => navigation.navigate('Login')}
-//           >
-//             <Text style={styles.ctaBannerLoginText}>
-//               Already have an account?{' '}
-//               <Text style={{ color: COLORS.accent, fontWeight: '700' }}>Login</Text>
-//             </Text>
-//           </TouchableOpacity>
-//         </View>
-
-//         {/* ── CONTACT ───────────────────────────────────────────────────────── */}
-//         <View style={[styles.section, styles.sectionAlt]}>
-//           <View style={styles.sectionBadge}>
-//             <Text style={styles.sectionBadgeText}>CONTACT US</Text>
-//           </View>
-//           <Text style={styles.sectionTitle}>Get in Touch</Text>
-
-//           {[
-//             { icon: '📞', label: 'Phone',   value: '+91 98765 43210' },
-//             { icon: '✉️', label: 'Email',   value: 'info@vahanfinserv.com' },
-//             { icon: '📍', label: 'Address', value: 'Vahan Finserv Pvt. Ltd., Mumbai, Maharashtra — 400001' },
-//             { icon: '🕐', label: 'Hours',   value: 'Mon–Sat: 9:00 AM – 7:00 PM' },
-//           ].map((c, i) => (
-//             <View key={i} style={styles.contactRow}>
-//               <Text style={styles.contactIcon}>{c.icon}</Text>
-//               <View>
-//                 <Text style={styles.contactLabel}>{c.label}</Text>
-//                 <Text style={styles.contactValue}>{c.value}</Text>
-//               </View>
-//             </View>
-//           ))}
-//         </View>
-
-//         {/* ── FOOTER ────────────────────────────────────────────────────────── */}
-//         <View style={styles.footer}>
-//           <Text style={styles.footerLogo}>
-//             <Text style={{ color: COLORS.accent }}>Vahan</Text> Finserv
-//           </Text>
-//           <Text style={styles.footerTagline}>
-//             Driving Dreams. Financing Futures.
-//           </Text>
-//           <Text style={styles.footerCopy}>
-//             © {new Date().getFullYear()} Vahan Finserv Pvt. Ltd. All rights reserved.
-//           </Text>
-//         </View>
-//       </ScrollView>
-//     </View>
-//   );
-// };
-
-// export default HomeScreen;
-
-// // ─── Styles ───────────────────────────────────────────────────────────────────
-// const styles = StyleSheet.create({
-//   root:        { flex: 1, backgroundColor: COLORS.background },
-//   scroll:      { flex: 1 },
-//   scrollContent: { flexGrow: 1 },
-
-//   // ── Hero
-//   hero: {
-//     width: W,
-//     height: H,
-//     justifyContent: 'flex-start',
-//   },
-//   videoFallback: {
-//     backgroundColor: COLORS.primary,
-//   },
-//   heroOverlay: {
-//     backgroundColor: 'rgba(6, 24, 66, 0.68)',
-//   },
-//   heroContent: {
-//     flex: 1,
-//   },
-
-//   // Nav
-//   navBar: {
-//     flexDirection: 'row',
-//     justifyContent: 'space-between',
-//     alignItems: 'center',
-//     paddingHorizontal: SPACING.lg,
-//     paddingTop: SPACING.lg,
-//     paddingBottom: SPACING.md,
-//   },
-//   navLogo: {
-//     fontSize: 22,
-//     fontWeight: '900',
-//     color: COLORS.white,
-//     letterSpacing: -0.5,
-//   },
-//   navLogoAccent: { color: COLORS.accent },
-//   navLoginBtn: {
-//     borderWidth: 1.5,
-//     borderColor: COLORS.accent,
-//     borderRadius: RADIUS.md,
-//     paddingHorizontal: 16,
-//     paddingVertical: 7,
-//   },
-//   navLoginText: {
-//     color: COLORS.accent,
-//     fontWeight: '700',
-//     fontSize: 14,
-//   },
-
-//   // Hero text
-//   heroTextWrap: {
-//     flex: 1,
-//     justifyContent: 'center',
-//     paddingHorizontal: SPACING.lg,
-//     paddingBottom: SPACING.xxl,
-//   },
-//   heroBadge: {
-//     alignSelf: 'flex-start',
-//     backgroundColor: COLORS.accent + '30',
-//     borderRadius: RADIUS.xl,
-//     paddingHorizontal: 14,
-//     paddingVertical: 6,
-//     marginBottom: SPACING.md,
-//     borderWidth: 1,
-//     borderColor: COLORS.accent + '60',
-//   },
-//   heroBadgeText: {
-//     color: COLORS.accent,
-//     fontSize: 12,
-//     fontWeight: '700',
-//     letterSpacing: 0.5,
-//   },
-//   heroHeading: {
-//     fontSize: 42,
-//     fontWeight: '900',
-//     color: COLORS.white,
-//     lineHeight: 50,
-//     marginBottom: SPACING.md,
-//     letterSpacing: -1,
-//   },
-//   heroHeadingAccent: {
-//     color: COLORS.accent,
-//   },
-//   heroSub: {
-//     fontSize: 16,
-//     color: 'rgba(255,255,255,0.82)',
-//     lineHeight: 25,
-//     marginBottom: SPACING.xl,
-//   },
-//   heroCtas: {
-//     flexDirection: 'row',
-//     gap: SPACING.sm,
-//   },
-//   ctaPrimary: {
-//     flex: 1,
-//     backgroundColor: COLORS.accent,
-//     paddingVertical: 15,
-//     borderRadius: RADIUS.md,
-//     alignItems: 'center',
-//   },
-//   ctaPrimaryText: {
-//     color: COLORS.primary,
-//     fontWeight: '800',
-//     fontSize: 15,
-//   },
-//   ctaSecondary: {
-//     flex: 1,
-//     backgroundColor: 'transparent',
-//     paddingVertical: 15,
-//     borderRadius: RADIUS.md,
-//     alignItems: 'center',
-//     borderWidth: 2,
-//     borderColor: COLORS.white,
-//   },
-//   ctaSecondaryText: {
-//     color: COLORS.white,
-//     fontWeight: '700',
-//     fontSize: 15,
-//   },
-
-//   // ── Stats bar
-//   statsBar: {
-//     flexDirection: 'row',
-//     backgroundColor: COLORS.primary,
-//     paddingVertical: SPACING.md,
-//   },
-//   statItem: {
-//     flex: 1,
-//     alignItems: 'center',
-//     paddingVertical: SPACING.sm,
-//   },
-//   statBorder: {
-//     borderRightWidth: 1,
-//     borderRightColor: 'rgba(255,255,255,0.15)',
-//   },
-//   statValue: {
-//     fontSize: 18,
-//     fontWeight: '900',
-//     color: COLORS.accent,
-//   },
-//   statLabel: {
-//     fontSize: 10,
-//     color: 'rgba(255,255,255,0.65)',
-//     marginTop: 2,
-//     textAlign: 'center',
-//     fontWeight: '600',
-//   },
-
-//   // ── Sections
-//   section: {
-//     backgroundColor: COLORS.white,
-//     paddingHorizontal: SPACING.lg,
-//     paddingVertical: SPACING.xl,
-//   },
-//   sectionAlt: {
-//     backgroundColor: COLORS.background,
-//   },
-//   sectionDark: {
-//     backgroundColor: COLORS.primary,
-//   },
-//   sectionBadge: {
-//     alignSelf: 'flex-start',
-//     backgroundColor: COLORS.accent + '22',
-//     borderRadius: RADIUS.xl,
-//     paddingHorizontal: 12,
-//     paddingVertical: 5,
-//     marginBottom: SPACING.sm,
-//   },
-//   sectionBadgeDark: {
-//     backgroundColor: COLORS.accent + '22',
-//   },
-//   sectionBadgeText: {
-//     fontSize: 10,
-//     fontWeight: '800',
-//     color: COLORS.accentDark,
-//     letterSpacing: 1.5,
-//   },
-//   sectionTitle: {
-//     fontSize: 26,
-//     fontWeight: '900',
-//     color: COLORS.text,
-//     letterSpacing: -0.5,
-//     marginBottom: SPACING.sm,
-//   },
-//   sectionSubtitle: {
-//     fontSize: 14,
-//     color: COLORS.textSecondary,
-//     lineHeight: 22,
-//     marginBottom: SPACING.lg,
-//   },
-//   sectionBody: {
-//     fontSize: 15,
-//     color: COLORS.textSecondary,
-//     lineHeight: 24,
-//     marginBottom: SPACING.md,
-//   },
-
-//   // About highlights
-//   aboutHighlights: {
-//     flexDirection: 'row',
-//     flexWrap: 'wrap',
-//     gap: SPACING.sm,
-//     marginTop: SPACING.md,
-//   },
-//   aboutHighlight: {
-//     flexDirection: 'row',
-//     alignItems: 'center',
-//     backgroundColor: COLORS.background,
-//     borderRadius: RADIUS.md,
-//     paddingHorizontal: 12,
-//     paddingVertical: 8,
-//     gap: 6,
-//     width: (W - SPACING.lg * 2 - SPACING.sm) / 2,
-//   },
-//   aboutHighlightIcon: { fontSize: 16 },
-//   aboutHighlightText: {
-//     fontSize: 12,
-//     fontWeight: '700',
-//     color: COLORS.text,
-//     flex: 1,
-//   },
-
-//   // Services grid
-//   grid: {
-//     flexDirection: 'row',
-//     flexWrap: 'wrap',
-//     gap: SPACING.sm,
-//   },
-//   serviceCard: {
-//     width: (W - SPACING.lg * 2 - SPACING.sm) / 2,
-//     backgroundColor: COLORS.white,
-//     borderRadius: RADIUS.lg,
-//     padding: SPACING.md,
-//     elevation: 2,
-//     shadowColor: '#000',
-//     shadowOffset: { width: 0, height: 1 },
-//     shadowOpacity: 0.07,
-//     shadowRadius: 4,
-//   },
-//   serviceIcon:  { fontSize: 28, marginBottom: 8 },
-//   serviceTitle: { fontSize: 14, fontWeight: '800', color: COLORS.text, marginBottom: 4 },
-//   serviceDesc:  { fontSize: 12, color: COLORS.textSecondary, lineHeight: 18 },
-
-//   // Why us rows
-//   whyRow: {
-//     flexDirection: 'row',
-//     alignItems: 'flex-start',
-//     marginBottom: SPACING.lg,
-//     gap: SPACING.md,
-//   },
-//   whyIconWrap: {
-//     width: 46,
-//     height: 46,
-//     borderRadius: RADIUS.md,
-//     backgroundColor: COLORS.accent + '18',
-//     alignItems: 'center',
-//     justifyContent: 'center',
-//     flexShrink: 0,
-//   },
-//   whyIcon:  { fontSize: 22 },
-//   whyText:  { flex: 1 },
-//   whyTitle: { fontSize: 15, fontWeight: '800', color: COLORS.text, marginBottom: 3 },
-//   whyDesc:  { fontSize: 13, color: COLORS.textSecondary, lineHeight: 20 },
-
-//   // Process steps
-//   stepRow: {
-//     flexDirection: 'row',
-//     marginBottom: 0,
-//   },
-//   stepLeft: {
-//     alignItems: 'center',
-//     width: 48,
-//     marginRight: SPACING.md,
-//   },
-//   stepCircle: {
-//     width: 44,
-//     height: 44,
-//     borderRadius: 22,
-//     backgroundColor: COLORS.accent,
-//     alignItems: 'center',
-//     justifyContent: 'center',
-//   },
-//   stepNum: {
-//     fontSize: 13,
-//     fontWeight: '900',
-//     color: COLORS.primary,
-//   },
-//   stepLine: {
-//     width: 2,
-//     flex: 1,
-//     minHeight: 32,
-//     backgroundColor: 'rgba(255,255,255,0.15)',
-//     marginVertical: 4,
-//   },
-//   stepContent: {
-//     flex: 1,
-//     paddingBottom: SPACING.lg,
-//     paddingTop: 10,
-//   },
-//   stepTitle: { fontSize: 15, fontWeight: '800', color: COLORS.white, marginBottom: 4 },
-//   stepDesc:  { fontSize: 13, color: 'rgba(255,255,255,0.68)', lineHeight: 20 },
-
-//   // CTA Banner
-//   ctaBanner: {
-//     backgroundColor: COLORS.accent,
-//     paddingHorizontal: SPACING.lg,
-//     paddingVertical: SPACING.xl,
-//     alignItems: 'center',
-//   },
-//   ctaBannerTitle: {
-//     fontSize: 26,
-//     fontWeight: '900',
-//     color: COLORS.primary,
-//     textAlign: 'center',
-//     letterSpacing: -0.5,
-//   },
-//   ctaBannerSub: {
-//     fontSize: 14,
-//     color: COLORS.primary,
-//     textAlign: 'center',
-//     lineHeight: 22,
-//     marginTop: SPACING.sm,
-//     marginBottom: SPACING.lg,
-//     opacity: 0.8,
-//   },
-//   ctaBannerBtn: {
-//     backgroundColor: COLORS.primary,
-//     paddingVertical: 15,
-//     paddingHorizontal: SPACING.xl,
-//     borderRadius: RADIUS.md,
-//     marginBottom: SPACING.md,
-//     width: '100%',
-//     alignItems: 'center',
-//   },
-//   ctaBannerBtnText: {
-//     color: COLORS.white,
-//     fontWeight: '800',
-//     fontSize: 16,
-//   },
-//   ctaBannerLoginLink: { padding: SPACING.sm },
-//   ctaBannerLoginText: {
-//     fontSize: 14,
-//     color: COLORS.primary,
-//     textAlign: 'center',
-//   },
-
-//   // Contact
-//   contactRow: {
-//     flexDirection: 'row',
-//     alignItems: 'flex-start',
-//     gap: SPACING.md,
-//     marginBottom: SPACING.lg,
-//   },
-//   contactIcon:  { fontSize: 22, marginTop: 2 },
-//   contactLabel: { fontSize: 11, fontWeight: '700', color: COLORS.textMuted, letterSpacing: 0.5, marginBottom: 2 },
-//   contactValue: { fontSize: 14, fontWeight: '600', color: COLORS.text },
-
-//   // Footer
-//   footer: {
-//     backgroundColor: COLORS.primary,
-//     paddingHorizontal: SPACING.lg,
-//     paddingVertical: SPACING.xl,
-//     alignItems: 'center',
-//   },
-//   footerLogo: {
-//     fontSize: 24,
-//     fontWeight: '900',
-//     color: COLORS.white,
-//     marginBottom: SPACING.xs,
-//   },
-//   footerTagline: {
-//     fontSize: 13,
-//     color: 'rgba(255,255,255,0.55)',
-//     marginBottom: SPACING.md,
-//     fontStyle: 'italic',
-//   },
-//   footerCopy: {
-//     fontSize: 11,
-//     color: 'rgba(255,255,255,0.35)',
-//     textAlign: 'center',
-//   },
-// });
-
-// src/screens/home/HomeScreen.js
-
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -713,6 +8,10 @@ import {
   Dimensions,
   StatusBar,
   SafeAreaView,
+  Animated,
+  Linking,
+  Alert,
+  Image,
 } from 'react-native';
 import Video from 'react-native-video';
 import { COLORS, SPACING, RADIUS } from '../../constants/theme';
@@ -729,16 +28,6 @@ const SERVICES = [
     icon: '🔄',
     title: 'Used Car Loan',
     desc: 'Get funds for pre-owned vehicles with minimal documentation.',
-  },
-  {
-    icon: '🏍️',
-    title: 'Two-Wheeler Loan',
-    desc: 'Affordable loans for bikes and scooters across all top brands.',
-  },
-  {
-    icon: '🚐',
-    title: 'Commercial Vehicle',
-    desc: 'Fleet financing solutions for trucks, buses, and commercial vans.',
   },
   {
     icon: '💳',
@@ -825,6 +114,10 @@ const STATS = [
 const HomeScreen = ({ navigation }) => {
   const videoRef = useRef(null);
   const [videoError, setVideoError] = useState(false);
+  const [showWhatsAppCard, setShowWhatsAppCard] = useState(true);
+
+  const tooltipFadeAnim = useRef(new Animated.Value(0)).current;
+  const tooltipSlideAnim = useRef(new Animated.Value(15)).current;
 
   const goToApply = () => {
     navigation.navigate('Register');
@@ -833,6 +126,127 @@ const HomeScreen = ({ navigation }) => {
   const goToLogin = () => {
     navigation.navigate('Login');
   };
+
+  const handlePhonePress = () => {
+    Linking.openURL('tel:+917755994123').catch(() => {
+      Alert.alert('Error', 'Unable to open dialer. Please dial +91 7755994123');
+    });
+  };
+
+  const handleEmailPress = () => {
+    Linking.openURL('mailto:support@vahanfinserv.com').catch(() => {
+      Alert.alert(
+        'Error',
+        'Unable to open mail client. Please email support@vahanfinserv.com',
+      );
+    });
+  };
+
+  const handleWhatsAppPress = () => {
+    const whatsappUrl =
+      "https://wa.me/917887334123?text=Hi%2C%20I'm%20interested%20in%20applying%20for%20a%20vehicle%20loan.";
+    Linking.openURL(whatsappUrl).catch(() => {
+      Alert.alert('Error', 'WhatsApp is not installed on this device.');
+    });
+  };
+
+  // Entry Animations & Floating animations
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(45)).current;
+  const floatAnim = useRef(new Animated.Value(0)).current;
+  const contactFade = useRef(new Animated.Value(0)).current;
+  const contactSlide = useRef(new Animated.Value(30)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // Trigger WhatsApp tooltip entry animation
+    Animated.sequence([
+      Animated.delay(600),
+      Animated.parallel([
+        Animated.timing(tooltipFadeAnim, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+        Animated.timing(tooltipSlideAnim, {
+          toValue: 0,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+      ]),
+    ]).start();
+
+    // Trigger contact section animations after a short delay
+    Animated.sequence([
+      Animated.delay(400),
+      Animated.parallel([
+        Animated.timing(contactFade, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+        Animated.timing(contactSlide, {
+          toValue: 0,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+      ]),
+    ]).start();
+
+    // Infinite float looping
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(floatAnim, {
+          toValue: -8,
+          duration: 1800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(floatAnim, {
+          toValue: 0,
+          duration: 1800,
+          useNativeDriver: true,
+        }),
+      ]),
+    ).start();
+
+    // Infinite pulse looping
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.04,
+          duration: 1200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1200,
+          useNativeDriver: true,
+        }),
+      ]),
+    ).start();
+  }, [
+    fadeAnim,
+    slideAnim,
+    floatAnim,
+    contactFade,
+    contactSlide,
+    pulseAnim,
+    tooltipFadeAnim,
+    tooltipSlideAnim,
+  ]);
 
   return (
     <View style={styles.root}>
@@ -846,14 +260,13 @@ const HomeScreen = ({ navigation }) => {
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        bounces={false}
-      >
+        bounces={false}>
         <View style={styles.hero}>
           {!videoError ? (
             <Video
               ref={videoRef}
-             // source={require('../../assets/videos/home-video.mp4')}
-                source={require('../../assets/videos/hero-car-video.mp4')}
+              // source={require('../../assets/videos/home-video.mp4')}
+              source={require('../../assets/videos/hero-car-video.mp4')}
               style={styles.heroVideo}
               resizeMode="cover"
               repeat={true}
@@ -870,6 +283,19 @@ const HomeScreen = ({ navigation }) => {
 
           <View style={styles.heroOverlay} />
 
+          {/* Ambient Glowing Orbs with floating transforms */}
+          <Animated.View
+            style={[styles.glowOrb1, { transform: [{ translateY: floatAnim }] }]}
+          />
+          <Animated.View
+            style={[
+              styles.glowOrb2,
+              {
+                transform: [{ translateY: Animated.multiply(floatAnim, -1.2) }],
+              },
+            ]}
+          />
+
           <SafeAreaView style={styles.heroContent}>
             <View style={styles.navBar}>
               <Text style={styles.logo}>
@@ -881,12 +307,23 @@ const HomeScreen = ({ navigation }) => {
               </TouchableOpacity>
             </View>
 
-            <View style={styles.heroTextBox}>
-              <View style={styles.heroBadge}>
+            <Animated.View
+              style={[
+                styles.heroTextBox,
+                {
+                  opacity: fadeAnim,
+                  transform: [{ translateY: Animated.add(slideAnim, floatAnim) }],
+                },
+              ]}>
+              <Animated.View
+                style={[
+                  styles.heroBadge,
+                  { transform: [{ translateY: floatAnim }] },
+                ]}>
                 <Text style={styles.heroBadgeText}>
                   🚗 Vehicle Loan Specialists
                 </Text>
-              </View>
+              </Animated.View>
 
               <Text style={styles.heroTitle}>
                 Drive Your{'\n'}
@@ -900,204 +337,334 @@ const HomeScreen = ({ navigation }) => {
               </Text>
 
               <View style={styles.heroButtons}>
-                <TouchableOpacity
-                  style={styles.applyBtn}
-                  onPress={goToApply}
-                  activeOpacity={0.85}
-                >
-                  <Text style={styles.applyBtnText}>Apply Now →</Text>
-                </TouchableOpacity>
+                <Animated.View
+                  style={{ flex: 1, transform: [{ scale: pulseAnim }] }}>
+                  <TouchableOpacity
+                    style={[styles.applyBtn, { width: '100%' }]}
+                    onPress={goToApply}
+                    activeOpacity={0.85}>
+                    <Text style={styles.applyBtnText}>Apply Now →</Text>
+                  </TouchableOpacity>
+                </Animated.View>
 
                 <TouchableOpacity
                   style={styles.secondaryBtn}
                   onPress={goToLogin}
-                  activeOpacity={0.85}
-                >
+                  activeOpacity={0.85}>
                   <Text style={styles.secondaryBtnText}>Login</Text>
                 </TouchableOpacity>
               </View>
-            </View>
+            </Animated.View>
           </SafeAreaView>
         </View>
 
-        <View style={styles.statsBar}>
-          {STATS.map((item, index) => (
-            <View
-              key={index}
-              style={[
-                styles.statItem,
-                index < STATS.length - 1 && styles.statBorder,
-              ]}
-            >
-              <Text style={styles.statValue}>{item.value}</Text>
-              <Text style={styles.statLabel}>{item.label}</Text>
-            </View>
-          ))}
-        </View>
-
-        <View style={styles.section}>
-          <View style={styles.sectionBadge}>
-            <Text style={styles.sectionBadgeText}>WHO WE ARE</Text>
-          </View>
-
-          <Text style={styles.sectionTitle}>About Vahan Finserv</Text>
-
-          <Text style={styles.sectionText}>
-            Vahan Finserv helps customers get vehicle loans with simple
-            documentation, fast approval and transparent processing.
-          </Text>
-
-          <Text style={styles.sectionText}>
-            Whether you are purchasing a new car, used car, two-wheeler or
-            commercial vehicle, our platform makes the loan journey smooth from
-            application to approval.
-          </Text>
-        </View>
-
-        <View style={[styles.section, styles.sectionAlt]}>
-          <View style={styles.sectionBadge}>
-            <Text style={styles.sectionBadgeText}>WHAT WE OFFER</Text>
-          </View>
-
-          <Text style={styles.sectionTitle}>Vehicle Loan Services</Text>
-
-          <Text style={styles.sectionSubtitle}>
-            Choose the right finance solution for your vehicle.
-          </Text>
-
-          <View style={styles.grid}>
-            {SERVICES.map((item, index) => (
-              <View key={index} style={styles.serviceCard}>
-                <Text style={styles.serviceIcon}>{item.icon}</Text>
-                <Text style={styles.serviceTitle}>{item.title}</Text>
-                <Text style={styles.serviceDesc}>{item.desc}</Text>
+        <Animated.View
+          style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
+          <View style={styles.statsBar}>
+            {STATS.map((item, index) => (
+              <View
+                key={index}
+                style={[
+                  styles.statItem,
+                  index < STATS.length - 1 && styles.statBorder,
+                ]}>
+                <Text style={styles.statValue}>{item.value}</Text>
+                <Text style={styles.statLabel}>{item.label}</Text>
               </View>
             ))}
           </View>
-        </View>
 
-        <View style={styles.section}>
-          <View style={styles.sectionBadge}>
-            <Text style={styles.sectionBadgeText}>WHY CHOOSE US</Text>
-          </View>
-
-          <Text style={styles.sectionTitle}>Simple, Fast & Reliable</Text>
-
-          {WHY_US.map((item, index) => (
-            <View key={index} style={styles.whyRow}>
-              <View style={styles.whyIconBox}>
-                <Text style={styles.whyIcon}>{item.icon}</Text>
-              </View>
-
-              <View style={styles.whyContent}>
-                <Text style={styles.whyTitle}>{item.title}</Text>
-                <Text style={styles.whyDesc}>{item.desc}</Text>
-              </View>
+          <View style={styles.section}>
+            <View style={styles.sectionBadge}>
+              <Text style={styles.sectionBadgeText}>WHO WE ARE</Text>
             </View>
-          ))}
-        </View>
 
-        <View style={[styles.section, styles.darkSection]}>
-          <View style={styles.darkBadge}>
-            <Text style={styles.darkBadgeText}>HOW IT WORKS</Text>
+            <Text style={styles.sectionTitle}>About Vahan Finserv</Text>
+
+            <Text style={styles.sectionText}>
+              Vahan Finserv helps customers get vehicle loans with simple
+              documentation, fast approval and transparent processing.
+            </Text>
+
+            <Text style={styles.sectionText}>
+              Whether you are purchasing a new car or used car, our platform
+              makes the loan journey smooth from application to approval.
+            </Text>
           </View>
 
-          <Text style={styles.darkTitle}>Loan Process</Text>
+          <View style={[styles.section, styles.sectionAlt]}>
+            <View style={styles.sectionBadge}>
+              <Text style={styles.sectionBadgeText}>WHAT WE OFFER</Text>
+            </View>
 
-          <Text style={styles.darkSubtitle}>
-            Complete your vehicle loan application in 5 simple steps.
-          </Text>
+            <Text style={styles.sectionTitle}>Vehicle Loan Services</Text>
 
-          {STEPS.map((item, index) => (
-            <View key={index} style={styles.stepRow}>
-              <View style={styles.stepLeft}>
-                <View style={styles.stepCircle}>
-                  <Text style={styles.stepNumber}>{item.step}</Text>
+            <Text style={styles.sectionSubtitle}>
+              Choose the right finance solution for your vehicle.
+            </Text>
+
+            <View style={styles.grid}>
+              {SERVICES.map((item, index) => (
+                <Animated.View
+                  key={index}
+                  style={[
+                    styles.serviceCard,
+                    { transform: [{ translateY: floatAnim }] },
+                  ]}>
+                  <Text style={styles.serviceIcon}>{item.icon}</Text>
+                  <Text style={styles.serviceTitle}>{item.title}</Text>
+                  <Text style={styles.serviceDesc}>{item.desc}</Text>
+                </Animated.View>
+              ))}
+            </View>
+          </View>
+
+          <View style={styles.section}>
+            <View style={styles.sectionBadge}>
+              <Text style={styles.sectionBadgeText}>WHY CHOOSE US</Text>
+            </View>
+
+            <Text style={styles.sectionTitle}>Simple, Fast & Reliable</Text>
+
+            {WHY_US.map((item, index) => (
+              <View key={index} style={styles.whyRow}>
+                <View style={styles.whyIconBox}>
+                  <Text style={styles.whyIcon}>{item.icon}</Text>
                 </View>
 
-                {index < STEPS.length - 1 && <View style={styles.stepLine} />}
+                <View style={styles.whyContent}>
+                  <Text style={styles.whyTitle}>{item.title}</Text>
+                  <Text style={styles.whyDesc}>{item.desc}</Text>
+                </View>
               </View>
+            ))}
+          </View>
 
-              <View style={styles.stepContent}>
-                <Text style={styles.stepTitle}>{item.title}</Text>
-                <Text style={styles.stepDesc}>{item.desc}</Text>
-              </View>
+          <View style={[styles.section, styles.darkSection]}>
+            <View style={styles.darkBadge}>
+              <Text style={styles.darkBadgeText}>HOW IT WORKS</Text>
             </View>
-          ))}
-        </View>
 
-        <View style={styles.ctaSection}>
-          <Text style={styles.ctaTitle}>Ready to Get Started?</Text>
+            <Text style={styles.darkTitle}>Loan Process</Text>
 
-          <Text style={styles.ctaText}>
-            Apply online and track your complete loan application from your
-            mobile.
-          </Text>
-
-          <TouchableOpacity style={styles.ctaBtn} onPress={goToApply}>
-            <Text style={styles.ctaBtnText}>Apply for Loan →</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.ctaLoginLink} onPress={goToLogin}>
-            <Text style={styles.ctaLoginText}>
-              Already have an account? Login
+            <Text style={styles.darkSubtitle}>
+              Complete your vehicle loan application in 5 simple steps.
             </Text>
-          </TouchableOpacity>
-        </View>
 
-        <View style={[styles.section, styles.sectionAlt]}>
-          <View style={styles.sectionBadge}>
-            <Text style={styles.sectionBadgeText}>CONTACT</Text>
+            {STEPS.map((item, index) => (
+              <View key={index} style={styles.stepRow}>
+                <View style={styles.stepLeft}>
+                  <View style={styles.stepCircle}>
+                    <Text style={styles.stepNumber}>{item.step}</Text>
+                  </View>
+
+                  {index < STEPS.length - 1 && <View style={styles.stepLine} />}
+                </View>
+
+                <View style={styles.stepContent}>
+                  <Text style={styles.stepTitle}>{item.title}</Text>
+                  <Text style={styles.stepDesc}>{item.desc}</Text>
+                </View>
+              </View>
+            ))}
           </View>
 
-          <Text style={styles.sectionTitle}>Get in Touch</Text>
+          <View style={styles.ctaSection}>
+            <View style={styles.ctaGlow} />
+            <Text style={styles.ctaTitle}>Ready to Get Started?</Text>
 
-          <View style={styles.contactRow}>
-            <Text style={styles.contactIcon}>📞</Text>
-            <View>
-              <Text style={styles.contactLabel}>Phone</Text>
-              <Text style={styles.contactValue}>+91 98765 43210</Text>
+            <Text style={styles.ctaText}>
+              Apply online and track your complete loan application from your
+              mobile.
+            </Text>
+
+            <Animated.View
+              style={{ width: '100%', transform: [{ scale: pulseAnim }] }}>
+              <TouchableOpacity
+                style={styles.ctaBtn}
+                onPress={goToApply}
+                activeOpacity={0.8}>
+                <Text style={styles.ctaBtnText}>Apply for Loan →</Text>
+              </TouchableOpacity>
+            </Animated.View>
+
+            <TouchableOpacity style={styles.ctaLoginLink} onPress={goToLogin}>
+              <Text style={styles.ctaLoginText}>
+                Already have an account? Login
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <Animated.View
+            style={[
+              styles.section,
+              styles.sectionAlt,
+              {
+                opacity: contactFade,
+                transform: [{ translateY: contactSlide }],
+              },
+            ]}>
+            <View style={styles.sectionBadge}>
+              <Text style={styles.sectionBadgeText}>CONTACT</Text>
             </View>
-          </View>
 
-          <View style={styles.contactRow}>
-            <Text style={styles.contactIcon}>✉️</Text>
-            <View>
-              <Text style={styles.contactLabel}>Email</Text>
-              <Text style={styles.contactValue}>info@vahanfinserv.com</Text>
+            <Text style={styles.sectionTitle}>Get in Touch</Text>
+
+            <TouchableOpacity
+              style={styles.contactCard}
+              onPress={handlePhonePress}
+              activeOpacity={0.75}>
+              <View
+                style={[
+                  styles.contactIconCircle,
+                  { backgroundColor: '#3B82F618' },
+                ]}>
+                <Text style={[styles.contactIcon, { color: '#3B82F6' }]}>📞</Text>
+              </View>
+              <View style={styles.contactTextContainer}>
+                <Text style={styles.contactLabel}>Call Us</Text>
+                <Text style={styles.contactValue}>+91 7755994123</Text>
+                <Text style={styles.contactSubText}>
+                  Mon-Sat, 9:00 AM - 6:00 PM
+                </Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.contactCard}
+              onPress={handleEmailPress}
+              activeOpacity={0.75}>
+              <View
+                style={[
+                  styles.contactIconCircle,
+                  { backgroundColor: '#10B98118' },
+                ]}>
+                <Text style={[styles.contactIcon, { color: '#10B981' }]}>✉️</Text>
+              </View>
+              <View style={styles.contactTextContainer}>
+                <Text style={styles.contactLabel}>Email Support</Text>
+                <Text style={styles.contactValue}>
+                  support@vahanfinserv.com
+                </Text>
+                <Text style={styles.contactSubText}>
+                  Response within 24 business hours
+                </Text>
+              </View>
+            </TouchableOpacity>
+          </Animated.View>
+
+          <View style={styles.footer}>
+            <Text style={styles.footerLogo}>
+              <Text style={{ color: COLORS.accent }}>Vahan</Text> Finserv
+            </Text>
+
+            <Text style={styles.footerText}>
+              Driving Dreams. Financing Futures.
+            </Text>
+
+            {/* Legal Compliance Links */}
+            <View style={styles.footerLinks}>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('PrivacyPolicy')}>
+                <Text style={styles.footerLinkText}>Privacy Policy</Text>
+              </TouchableOpacity>
+              <Text style={styles.footerLinkDivider}>|</Text>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('TermsConditions')}>
+                <Text style={styles.footerLinkText}>Terms & Conditions</Text>
+              </TouchableOpacity>
+              <Text style={styles.footerLinkDivider}>|</Text>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('RefundPolicy')}>
+                <Text style={styles.footerLinkText}>No Refund Policy</Text>
+              </TouchableOpacity>
+              <Text style={styles.footerLinkDivider}>|</Text>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('ContactUs')}>
+                <Text style={styles.footerLinkText}>Contact Us</Text>
+              </TouchableOpacity>
             </View>
-          </View>
 
-          <View style={styles.contactRow}>
-            <Text style={styles.contactIcon}>📍</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.contactLabel}>Address</Text>
-              <Text style={styles.contactValue}>
-                Vahan Finserv Pvt. Ltd., Maharashtra, India
+            <Text style={styles.footerCopy}>
+              © {new Date().getFullYear()} Vahan Finserv. All rights reserved.
+            </Text>
+          </View>
+        </Animated.View>
+      </ScrollView>
+
+      {/* Floating WhatsApp Widget */}
+      {showWhatsAppCard && (
+        <Animated.View
+          style={[
+            styles.whatsAppCardContainer,
+            {
+              opacity: tooltipFadeAnim,
+              transform: [{ translateY: tooltipSlideAnim }],
+            },
+          ]}>
+          <TouchableOpacity
+            style={styles.whatsAppCard}
+            onPress={handleWhatsAppPress}
+            activeOpacity={0.95}>
+            {/* Close button */}
+            <TouchableOpacity
+              style={styles.whatsAppCardClose}
+              onPress={() => setShowWhatsAppCard(false)}
+              activeOpacity={0.7}>
+              <Text style={styles.whatsAppCardCloseText}>×</Text>
+            </TouchableOpacity>
+
+            {/* Badge */}
+            <View style={styles.whatsAppCardBadge}>
+              <Text style={styles.whatsAppCardBadgeText}>
+                ⚡ QUICK LOAN OFFER
               </Text>
             </View>
-          </View>
-        </View>
 
-        <View style={styles.footer}>
-          <Text style={styles.footerLogo}>
-            <Text style={{ color: COLORS.accent }}>Vahan</Text> Finserv
-          </Text>
+            {/* Title */}
+            <Text style={styles.whatsAppCardTitle}>
+              Know Your Loan Status{'\n'}in{' '}
+              <Text style={styles.whatsAppCardTitleHighlight}>10 Minutes</Text>
+            </Text>
 
-          <Text style={styles.footerText}>
-            Driving Dreams. Financing Futures.
-          </Text>
+            {/* List items */}
+            <View style={styles.whatsAppCardRow}>
+              <Text style={styles.whatsAppCardRowIcon}>⚡</Text>
+              <Text style={styles.whatsAppCardRowText}>Fast Approval</Text>
+            </View>
+            <View style={styles.whatsAppCardRow}>
+              <Text style={styles.whatsAppCardRowIcon}>🔒</Text>
+              <Text style={styles.whatsAppCardRowText}>Secure Process</Text>
+            </View>
+            <View style={styles.whatsAppCardRow}>
+              <Text style={styles.whatsAppCardRowIcon}>👇</Text>
+              <Text
+                style={[
+                  styles.whatsAppCardRowText,
+                  styles.whatsAppCardRowTextMuted,
+                ]}>
+                Tap WhatsApp
+              </Text>
+            </View>
+          </TouchableOpacity>
 
-          <Text style={styles.footerCopy}>
-            © {new Date().getFullYear()} Vahan Finserv. All rights reserved.
-          </Text>
-        </View>
-      </ScrollView>
+          {/* Bubble tail pointing to the button */}
+          <View style={styles.whatsAppCardTail} />
+        </Animated.View>
+      )}
+
+      <TouchableOpacity
+        style={styles.whatsAppButton}
+        onPress={handleWhatsAppPress}
+        activeOpacity={0.9}>
+        <Image
+          source={require('../../assets/whatsapp.png')}
+          style={styles.whatsAppButtonIcon}
+        />
+      </TouchableOpacity>
     </View>
   );
 };
-
-export default HomeScreen;
 
 const styles = StyleSheet.create({
   root: {
@@ -1337,7 +904,13 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.lg,
     padding: SPACING.md,
-    elevation: 2,
+    elevation: 3,
+    shadowColor: '#0B2A4A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
 
   serviceIcon: {
@@ -1480,24 +1053,69 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
 
-  ctaSection: {
+  glowOrb1: {
+    position: 'absolute',
+    top: '5%',
+    left: '-20%',
+    width: 260,
+    height: 260,
+    borderRadius: 130,
     backgroundColor: COLORS.accent,
+    opacity: 0.12,
+  },
+
+  glowOrb2: {
+    position: 'absolute',
+    bottom: '15%',
+    right: '-25%',
+    width: 300,
+    height: 300,
+    borderRadius: 150,
+    backgroundColor: '#0047d9',
+    opacity: 0.14,
+  },
+
+  ctaSection: {
+    backgroundColor: COLORS.primary,
+    marginHorizontal: SPACING.md,
+    marginVertical: SPACING.xl,
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.xl,
+    borderRadius: RADIUS.xl,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowOffset: { width: 0, height: 6 },
+    shadowRadius: 16,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+
+  ctaGlow: {
+    position: 'absolute',
+    top: '-50%',
+    right: '-30%',
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    backgroundColor: COLORS.accent,
+    opacity: 0.14,
   },
 
   ctaTitle: {
     fontSize: 26,
     fontWeight: '900',
-    color: COLORS.primary,
+    color: COLORS.white,
     textAlign: 'center',
   },
 
   ctaText: {
     fontSize: 14,
-    color: COLORS.primary,
-    opacity: 0.8,
+    color: COLORS.white,
+    opacity: 0.82,
     textAlign: 'center',
     lineHeight: 22,
     marginTop: SPACING.sm,
@@ -1506,14 +1124,15 @@ const styles = StyleSheet.create({
 
   ctaBtn: {
     width: '100%',
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.accent,
     paddingVertical: 15,
     borderRadius: RADIUS.md,
     alignItems: 'center',
+    elevation: 2,
   },
 
   ctaBtnText: {
-    color: COLORS.white,
+    color: COLORS.primary,
     fontSize: 16,
     fontWeight: '900',
   },
@@ -1523,32 +1142,59 @@ const styles = StyleSheet.create({
   },
 
   ctaLoginText: {
-    color: COLORS.primary,
+    color: COLORS.accent,
     fontSize: 14,
     fontWeight: '700',
   },
 
-  contactRow: {
+  contactCard: {
     flexDirection: 'row',
-    gap: SPACING.md,
-    marginBottom: SPACING.lg,
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
+    marginBottom: SPACING.md,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+  },
+
+  contactIconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: SPACING.md,
   },
 
   contactIcon: {
-    fontSize: 22,
+    fontSize: 20,
+  },
+
+  contactTextContainer: {
+    flex: 1,
   },
 
   contactLabel: {
-    fontSize: 11,
-    color: COLORS.textMuted,
+    fontSize: 13,
     fontWeight: '800',
+    color: COLORS.text,
     marginBottom: 2,
   },
 
   contactValue: {
     fontSize: 14,
-    color: COLORS.text,
-    fontWeight: '600',
+    color: COLORS.primary,
+    fontWeight: '700',
+  },
+
+  contactSubText: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+    marginTop: 2,
   },
 
   footer: {
@@ -1556,6 +1202,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.xl,
     alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.05)',
   },
 
   footerLogo: {
@@ -1571,9 +1219,157 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
   },
 
+  footerLinks: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 2,
+    marginBottom: SPACING.lg,
+  },
+
+  footerLinkText: {
+    color: COLORS.accent,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+
+  footerLinkDivider: {
+    color: 'rgba(255, 255, 255, 0.2)',
+    fontSize: 12,
+  },
+
   footerCopy: {
     fontSize: 11,
     color: 'rgba(255,255,255,0.35)',
     textAlign: 'center',
   },
+
+  // WhatsApp Floating Button & Tooltip Card
+  whatsAppButton: {
+    position: 'absolute',
+    bottom: 24,
+    right: 24,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#25D366',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 6,
+    zIndex: 9999,
+  },
+
+  whatsAppButtonIcon: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+  },
+
+  whatsAppCardContainer: {
+    position: 'absolute',
+    bottom: 96,
+    right: 24,
+    width: 270,
+    zIndex: 9999,
+  },
+
+  whatsAppCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 16,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowOffset: { width: 0, height: 6 },
+    shadowRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    position: 'relative',
+  },
+
+  whatsAppCardClose: {
+    position: 'absolute',
+    top: 10,
+    right: 12,
+    zIndex: 10,
+    padding: 4,
+  },
+
+  whatsAppCardCloseText: {
+    fontSize: 22,
+    color: '#98A2B3',
+    fontWeight: 'bold',
+    lineHeight: 20,
+  },
+
+  whatsAppCardBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#0B2A4A',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    marginBottom: 8,
+  },
+
+  whatsAppCardBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+
+  whatsAppCardTitle: {
+    fontSize: 17,
+    fontWeight: '900',
+    color: '#061842',
+    lineHeight: 22,
+    marginBottom: 12,
+  },
+
+  whatsAppCardTitleHighlight: {
+    color: '#27D3C3',
+  },
+
+  whatsAppCardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+
+  whatsAppCardRowIcon: {
+    fontSize: 14,
+    marginRight: 8,
+  },
+
+  whatsAppCardRowText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#344054',
+  },
+
+  whatsAppCardRowTextMuted: {
+    color: '#98A2B3',
+    fontWeight: '500',
+  },
+
+  whatsAppCardTail: {
+    position: 'absolute',
+    bottom: -7,
+    right: 22,
+    width: 14,
+    height: 14,
+    backgroundColor: '#FFFFFF',
+    transform: [{ rotate: '45deg' }],
+    borderRightWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: '#E2E8F0',
+  },
 });
+
+export default HomeScreen;

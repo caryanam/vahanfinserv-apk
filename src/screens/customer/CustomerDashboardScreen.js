@@ -911,6 +911,7 @@ const CUSTOMER_MENU = [
   {name: 'Documents', emoji: '📄'},
   {name: 'Status', emoji: '📋'},
   {name: 'Settings', emoji: '⚙️'},
+  {name: 'Legal', emoji: '⚖️'},
 ];
 
 const DOCUMENT_LABELS = {
@@ -972,78 +973,66 @@ const CustomerDashboardScreen = ({navigation}) => {
     rejected: 0,
   });
 
-  const loadData = useCallback(
-    async userId => {
-      if (!userId) {
-        setLoading(false);
-        setRefreshing(false);
-        return;
+  const regType = String(
+    profile?.registrationType || userData?.registrationType || '',
+  )
+    .toUpperCase()
+    .trim();
+  const isPaid =
+    profile?.paymentDone === true ||
+    String(profile?.paymentStatus || '')
+      .toUpperCase()
+      .trim() === 'SUCCESS' ||
+    userData?.paymentDone === true ||
+    String(userData?.paymentStatus || '')
+      .toUpperCase()
+      .trim() === 'SUCCESS' ||
+    __DEV__;
+
+  const loadData = useCallback(async (userId, localUserData) => {
+    if (!userId) {
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
+
+    try {
+      const [profileRes, docsRes] = await Promise.allSettled([
+        getUserProfile(userId).catch(() => null),
+        getUserDocuments(userId).catch(() => ({data: {data: []}})),
+      ]);
+
+      if (profileRes.status === 'fulfilled' && profileRes.value) {
+        const loadedProfile =
+          profileRes.value?.data?.data ||
+          profileRes.value?.data ||
+          profileRes.value;
+        setProfile(loadedProfile);
       }
 
-      try {
-        const [profileRes, docsRes] = await Promise.allSettled([
-          getUserProfile(userId).catch(() => null),
-          getUserDocuments(userId).catch(() => ({data: {data: []}})),
-        ]);
+      const docList =
+        docsRes.status === 'fulfilled'
+          ? docsRes.value?.data?.data || docsRes.value?.data || []
+          : [];
 
-        if (profileRes.status === 'fulfilled' && profileRes.value) {
-          const loadedProfile =
-            profileRes.value?.data?.data ||
-            profileRes.value?.data ||
-            profileRes.value;
-          setProfile(loadedProfile);
+      const docs = Array.isArray(docList) ? docList : [];
+      setDocuments(docs);
 
-          const regType = String(loadedProfile?.registrationType || '')
-            .toUpperCase()
-            .trim();
-          const isPaid =
-            loadedProfile?.paymentDone === true ||
-            String(loadedProfile?.paymentStatus || '')
-              .toUpperCase()
-              .trim() === 'SUCCESS';
-
-          if (regType === 'INDIVIDUAL' && !isPaid) {
-            console.log(
-              'INDIVIDUAL UNPAID USER AT DASHBOARD, REDIRECTING TO PAYMENT...',
-            );
-            navigation.reset({
-              index: 0,
-              routes: [
-                {
-                  name: 'Payment',
-                  params: {userId, applicationNumber: `USER-${userId}`},
-                },
-              ],
-            });
-            return;
-          }
-        }
-
-        const docList =
-          docsRes.status === 'fulfilled'
-            ? docsRes.value?.data?.data || docsRes.value?.data || []
-            : [];
-
-        const docs = Array.isArray(docList) ? docList : [];
-        setDocuments(docs);
-
-        setDocStats({
-          total: docs.length,
-          pending: docs.filter(d => d.status === 'PENDING').length,
-          approved: docs.filter(
-            d => d.status === 'APPROVED' || d.status === 'VERIFIED',
-          ).length,
-          rejected: docs.filter(d => d.status === 'REJECTED').length,
-        });
-      } catch (err) {
-        Toast.show({type: 'error', text1: 'Failed to load data'});
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
-      }
-    },
-    [navigation],
-  );
+      setDocStats({
+        total: docs.length,
+        pending: docs.filter(d => d.status === 'PENDING').length,
+        approved: docs.filter(
+          d => d.status === 'APPROVED' || d.status === 'VERIFIED',
+        ).length,
+        rejected: docs.filter(d => d.status === 'REJECTED').length,
+      });
+    } catch (err) {
+      Toast.show({type: 'error', text1: 'Failed to load data'});
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -1052,7 +1041,7 @@ const CustomerDashboardScreen = ({navigation}) => {
       if (raw) {
         const parsed = JSON.parse(raw);
         setUserData(parsed);
-        loadData(parsed.id);
+        loadData(parsed.id, parsed);
       } else {
         setLoading(false);
       }
@@ -1141,7 +1130,7 @@ const CustomerDashboardScreen = ({navigation}) => {
                 refreshing={refreshing}
                 onRefresh={() => {
                   setRefreshing(true);
-                  loadData(userData?.id);
+                  loadData(userData?.id, userData);
                 }}
               />
             }>
@@ -1235,6 +1224,19 @@ const CustomerDashboardScreen = ({navigation}) => {
                   {formatINR(READY2DRIVE_TOTAL_AMOUNT)}
                 </Text>
               </View>
+
+              {regType === 'INDIVIDUAL' && !isPaid && (
+                <TouchableOpacity
+                  style={styles.payNowBtn}
+                  onPress={() =>
+                    navigation.navigate('Payment', {
+                      userId: userData?.id,
+                      applicationNumber: `USER-${userData?.id}`,
+                    })
+                  }>
+                  <Text style={styles.payNowBtnText}>Pay Now →</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </ScrollView>
         );
@@ -1291,6 +1293,58 @@ const CustomerDashboardScreen = ({navigation}) => {
                 Role: {profile?.role || userData?.role || '—'}
               </Text>
             </View>
+          </ScrollView>
+        );
+
+      case 'Legal':
+        return (
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <Text style={styles.sectionTitle}>Legal & Compliance</Text>
+            <Text style={styles.sectionSubtitle}>
+              Please select a policy or contact option to read more details.
+            </Text>
+
+            {[
+              {
+                title: 'Privacy Policy',
+                desc: 'How we collect, use, and safeguard your data.',
+                icon: '🛡️',
+                screen: 'PrivacyPolicy',
+              },
+              {
+                title: 'Terms & Conditions',
+                desc: 'User eligibility, responsibilities, and disclosures.',
+                icon: '📝',
+                screen: 'TermsConditions',
+              },
+              {
+                title: 'No Refund Policy',
+                desc: 'Detailed payment and processing fee terms.',
+                icon: '💳',
+                screen: 'RefundPolicy',
+              },
+              {
+                title: 'Contact Us',
+                desc: 'Vahan Finserv support channels and details.',
+                icon: '📞',
+                screen: 'ContactUs',
+              },
+            ].map((item, index) => (
+              <TouchableOpacity
+                key={index}
+                style={styles.legalMenuCard}
+                onPress={() => navigation.navigate(item.screen)}
+                activeOpacity={0.8}>
+                <View style={styles.legalMenuIconBox}>
+                  <Text style={styles.legalMenuIcon}>{item.icon}</Text>
+                </View>
+                <View style={styles.legalMenuText}>
+                  <Text style={styles.legalMenuCardTitle}>{item.title}</Text>
+                  <Text style={styles.legalMenuCardDesc}>{item.desc}</Text>
+                </View>
+                <Text style={styles.legalMenuArrow}>→</Text>
+              </TouchableOpacity>
+            ))}
           </ScrollView>
         );
 
@@ -1517,6 +1571,69 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.sm,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
+  },
+  sectionSubtitle: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.md,
+    lineHeight: 18,
+  },
+  legalMenuCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
+    marginBottom: SPACING.sm,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowOffset: {width: 0, height: 1},
+    shadowRadius: 3,
+  },
+  legalMenuIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: RADIUS.sm,
+    backgroundColor: `${COLORS.accent}15`,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: SPACING.md,
+  },
+  legalMenuIcon: {
+    fontSize: 20,
+  },
+  legalMenuText: {
+    flex: 1,
+  },
+  legalMenuCardTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: COLORS.text,
+  },
+  legalMenuCardDesc: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
+  legalMenuArrow: {
+    fontSize: 18,
+    color: COLORS.textMuted,
+    fontWeight: '800',
+  },
+  payNowBtn: {
+    backgroundColor: COLORS.primary,
+    borderRadius: RADIUS.sm,
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginTop: 15,
+  },
+  payNowBtnText: {
+    color: COLORS.white,
+    fontWeight: '800',
+    fontSize: 14,
   },
 });
 

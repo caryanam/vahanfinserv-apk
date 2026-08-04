@@ -1,33 +1,38 @@
-import React, { useState } from 'react';
+import React, {useState} from 'react';
 import {
-  View, Text, StyleSheet, SafeAreaView,
-  TouchableOpacity, ScrollView, ActivityIndicator,
+  View,
+  Text,
+  StyleSheet,
+  SafeAreaView,
+  TouchableOpacity,
+  ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import DocumentPicker from 'react-native-document-picker';
-import { launchCamera } from 'react-native-image-picker';
+import {launchCamera} from 'react-native-image-picker';
 import api from '../../services/api';
 import Toast from 'react-native-toast-message';
-import { sanitizeFileName } from '../../services/fileUtils';
-import { COLORS, SPACING, RADIUS } from '../../constants/theme';
+import {sanitizeFileName} from '../../services/fileUtils';
+import {COLORS, SPACING, RADIUS} from '../../constants/theme';
 
 const ALLOWED_TYPES = [DocumentPicker.types.images, DocumentPicker.types.pdf];
 
 const VEHICLE_DOCS = [
-  { type: 'RC_1',                 label: 'RC Front Side',         icon: '📋' },
-  { type: 'RC_2',                 label: 'RC Back Side',          icon: '📋' },
-  { type: 'INSURANCE',            label: 'Insurance',             icon: '🛡️' },
-  { type: 'ODOMETER_READING',     label: 'Odometer Reading',      icon: '🔢' },
-  { type: 'CHASSIS_NUMBER',       label: 'Chassis Number',        icon: '🔩' },
-  { type: 'CAR_FRONT_SIDE_PHOTO', label: 'Car Front Side Photo',  icon: '📸' },
-  { type: 'CAR_BACK_SIDE_PHOTO',  label: 'Car Back Side Photo',   icon: '📷' },
+  {type: 'RC_1', label: 'RC Front Side', icon: '📋'},
+  {type: 'RC_2', label: 'RC Back Side', icon: '📋'},
+  {type: 'INSURANCE', label: 'Insurance', icon: '🛡️'},
+  {type: 'ODOMETER_READING', label: 'Odometer Reading', icon: '🔢'},
+  {type: 'CHASSIS_NUMBER', label: 'Chassis Number', icon: '🔩'},
+  {type: 'CAR_FRONT_SIDE_PHOTO', label: 'Car Front Side Photo', icon: '📸'},
+  {type: 'CAR_BACK_SIDE_PHOTO', label: 'Car Back Side Photo', icon: '📷'},
 ];
 
-const VehicleDocumentsScreen = ({ navigation, route }) => {
-  const { applicationNumber, userId } = route.params || {};
+const VehicleDocumentsScreen = ({navigation, route}) => {
+  const {applicationNumber, userId} = route.params || {};
   const [loading, setLoading] = useState(false);
   const [files, setFiles] = useState({});
 
-  const pickFile = async (docType) => {
+  const pickFile = async docType => {
     try {
       const result = await DocumentPicker.pickSingle({
         type: ALLOWED_TYPES,
@@ -43,12 +48,12 @@ const VehicleDocumentsScreen = ({ navigation, route }) => {
       }));
     } catch (err) {
       if (!DocumentPicker.isCancel(err)) {
-        Toast.show({ type: 'error', text1: 'Could not open file picker' });
+        Toast.show({type: 'error', text1: 'Could not open file picker'});
       }
     }
   };
 
-  const captureFromCamera = async (docType) => {
+  const captureFromCamera = async docType => {
     try {
       const result = await launchCamera({
         mediaType: 'photo',
@@ -58,14 +63,17 @@ const VehicleDocumentsScreen = ({ navigation, route }) => {
         saveToPhotos: false,
       });
 
-      if (result.didCancel) return;
+      if (result.didCancel) {
+        return;
+      }
 
       if (result.errorCode) {
         Toast.show({
           type: 'error',
-          text1: result.errorCode === 'camera_unavailable'
-            ? 'Camera not available'
-            : result.errorMessage || 'Camera error',
+          text1:
+            result.errorCode === 'camera_unavailable'
+              ? 'Camera not available'
+              : result.errorMessage || 'Camera error',
         });
         return;
       }
@@ -82,7 +90,7 @@ const VehicleDocumentsScreen = ({ navigation, route }) => {
         }));
       }
     } catch (err) {
-      Toast.show({ type: 'error', text1: 'Could not open camera' });
+      Toast.show({type: 'error', text1: 'Could not open camera'});
     }
   };
 
@@ -96,14 +104,14 @@ const VehicleDocumentsScreen = ({ navigation, route }) => {
       type: file.type || 'application/octet-stream',
     });
     await api.post('/documents/upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+      headers: {'Content-Type': 'multipart/form-data'},
     });
   };
 
   const handleSave = async () => {
     const missing = VEHICLE_DOCS.filter(d => !files[d.type]);
     if (missing.length > 0) {
-      Toast.show({ type: 'error', text1: 'Please upload all vehicle documents' });
+      Toast.show({type: 'error', text1: 'Please upload all vehicle documents'});
       return;
     }
     const selected = VEHICLE_DOCS;
@@ -114,11 +122,13 @@ const VehicleDocumentsScreen = ({ navigation, route }) => {
           await uploadDocument(doc.type, files[doc.type]);
         } catch (err) {
           const msg = err?.response?.data?.message || '';
-          if (!msg.toLowerCase().includes('already uploaded')) throw err;
+          if (!msg.toLowerCase().includes('already uploaded')) {
+            throw err;
+          }
         }
       }
-      Toast.show({ type: 'success', text1: 'Vehicle documents uploaded' });
-      navigation.navigate('VerifySubmit', { applicationNumber, userId });
+      Toast.show({type: 'success', text1: 'Vehicle documents uploaded'});
+      navigation.navigate('VerifySubmit', {applicationNumber, userId});
     } catch (err) {
       Toast.show({
         type: 'error',
@@ -129,7 +139,7 @@ const VehicleDocumentsScreen = ({ navigation, route }) => {
     }
   };
 
-  const UploadCard = ({ label, icon, docType }) => {
+  const UploadCard = ({label, icon, docType}) => {
     const file = files[docType];
     return (
       <View style={styles.uploadSection}>
@@ -141,13 +151,19 @@ const VehicleDocumentsScreen = ({ navigation, route }) => {
           <View style={styles.uploadedBox}>
             <View style={styles.uploadedInfo}>
               <Text style={styles.fileIcon}>📄</Text>
-              <Text style={styles.fileName} numberOfLines={1}>{file.name}</Text>
+              <Text style={styles.fileName} numberOfLines={1}>
+                {file.name}
+              </Text>
             </View>
             <View style={styles.replaceActions}>
-              <TouchableOpacity onPress={() => captureFromCamera(docType)} style={styles.replaceCameraBtn}>
+              <TouchableOpacity
+                onPress={() => captureFromCamera(docType)}
+                style={styles.replaceCameraBtn}>
                 <Text style={styles.replaceBtnText}>📷</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => pickFile(docType)} style={styles.replaceBtn}>
+              <TouchableOpacity
+                onPress={() => pickFile(docType)}
+                style={styles.replaceBtn}>
                 <Text style={styles.replaceBtnText}>Replace</Text>
               </TouchableOpacity>
             </View>
@@ -158,10 +174,14 @@ const VehicleDocumentsScreen = ({ navigation, route }) => {
             <Text style={styles.uploadBoxText}>Upload Document</Text>
             <Text style={styles.uploadBoxHint}>JPG, PNG or PDF</Text>
             <View style={styles.uploadActions}>
-              <TouchableOpacity style={styles.cameraBtn} onPress={() => captureFromCamera(docType)}>
+              <TouchableOpacity
+                style={styles.cameraBtn}
+                onPress={() => captureFromCamera(docType)}>
                 <Text style={styles.cameraBtnText}>📷 Camera</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.galleryBtn} onPress={() => pickFile(docType)}>
+              <TouchableOpacity
+                style={styles.galleryBtn}
+                onPress={() => pickFile(docType)}>
                 <Text style={styles.galleryBtnText}>📁 Gallery / Files</Text>
               </TouchableOpacity>
             </View>
@@ -173,7 +193,9 @@ const VehicleDocumentsScreen = ({ navigation, route }) => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled">
         <View style={styles.headerBadge}>
           <Text style={styles.headerBadgeText}>STEP 6 OF 6</Text>
         </View>
@@ -190,7 +212,11 @@ const VehicleDocumentsScreen = ({ navigation, route }) => {
           {VEHICLE_DOCS.map((doc, i) => (
             <View key={doc.type}>
               {i > 0 && <View style={styles.divider} />}
-              <UploadCard label={doc.label} icon={doc.icon} docType={doc.type} />
+              <UploadCard
+                label={doc.label}
+                icon={doc.icon}
+                docType={doc.type}
+              />
             </View>
           ))}
         </View>
@@ -198,8 +224,7 @@ const VehicleDocumentsScreen = ({ navigation, route }) => {
         <TouchableOpacity
           style={[styles.primaryBtn, loading && styles.primaryBtnDisabled]}
           onPress={handleSave}
-          disabled={loading}
-        >
+          disabled={loading}>
           {loading ? (
             <ActivityIndicator color={COLORS.white} />
           ) : (
@@ -207,7 +232,9 @@ const VehicleDocumentsScreen = ({ navigation, route }) => {
           )}
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={() => navigation.goBack()}>
           <Text style={styles.backBtnText}>← Previous</Text>
         </TouchableOpacity>
       </ScrollView>
@@ -218,7 +245,7 @@ const VehicleDocumentsScreen = ({ navigation, route }) => {
 export default VehicleDocumentsScreen;
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: COLORS.background },
+  safeArea: {flex: 1, backgroundColor: COLORS.background},
 
   container: {
     padding: SPACING.md,
@@ -258,7 +285,7 @@ const styles = StyleSheet.create({
     padding: SPACING.lg,
     marginBottom: SPACING.md,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: {width: 0, height: 1},
     shadowOpacity: 0.06,
     shadowRadius: 4,
     elevation: 2,
@@ -282,14 +309,14 @@ const styles = StyleSheet.create({
     marginVertical: SPACING.md,
   },
 
-  uploadSection: { marginBottom: 4 },
+  uploadSection: {marginBottom: 4},
   uploadLabelRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 10,
   },
-  uploadIcon: { fontSize: 18, marginRight: 8 },
-  uploadLabel: { fontSize: 14, fontWeight: '700', color: COLORS.text },
+  uploadIcon: {fontSize: 18, marginRight: 8},
+  uploadLabel: {fontSize: 14, fontWeight: '700', color: COLORS.text},
 
   uploadBox: {
     borderWidth: 1.5,
@@ -300,9 +327,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: COLORS.accent + '0A',
   },
-  uploadBoxIcon: { fontSize: 28, marginBottom: 8 },
-  uploadBoxText: { fontSize: 14, fontWeight: '700', color: COLORS.accentDark },
-  uploadBoxHint: { fontSize: 11, color: COLORS.textMuted, marginTop: 4 },
+  uploadBoxIcon: {fontSize: 28, marginBottom: 8},
+  uploadBoxText: {fontSize: 14, fontWeight: '700', color: COLORS.accentDark},
+  uploadBoxHint: {fontSize: 11, color: COLORS.textMuted, marginTop: 4},
 
   uploadedBox: {
     flexDirection: 'row',
@@ -321,15 +348,15 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: SPACING.sm,
   },
-  fileIcon: { fontSize: 20, marginRight: 8 },
-  fileName: { fontSize: 13, fontWeight: '600', color: COLORS.text, flex: 1 },
+  fileIcon: {fontSize: 20, marginRight: 8},
+  fileName: {fontSize: 13, fontWeight: '600', color: COLORS.text, flex: 1},
   replaceBtn: {
     backgroundColor: COLORS.primary + '14',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: RADIUS.sm,
   },
-  replaceBtnText: { fontSize: 12, fontWeight: '700', color: COLORS.primary },
+  replaceBtnText: {fontSize: 12, fontWeight: '700', color: COLORS.primary},
 
   replaceActions: {
     flexDirection: 'row',
@@ -380,9 +407,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: SPACING.sm,
   },
-  primaryBtnDisabled: { opacity: 0.7 },
-  primaryBtnText: { color: COLORS.white, fontWeight: '800', fontSize: 15 },
+  primaryBtnDisabled: {opacity: 0.7},
+  primaryBtnText: {color: COLORS.white, fontWeight: '800', fontSize: 15},
 
-  backBtn: { padding: 14, alignItems: 'center' },
-  backBtnText: { color: COLORS.primary, fontWeight: '700', fontSize: 14 },
+  backBtn: {padding: 14, alignItems: 'center'},
+  backBtnText: {color: COLORS.primary, fontWeight: '700', fontSize: 14},
 });

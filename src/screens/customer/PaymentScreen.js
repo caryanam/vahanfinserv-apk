@@ -99,16 +99,39 @@ const PaymentScreen = ({navigation, route}) => {
         return;
       }
 
+      const rawUser = await AsyncStorage.getItem('userData');
+      const parsedUser = rawUser ? JSON.parse(rawUser) : null;
       const loadedIsIndividualUser =
         normalize(loadedUser?.role) === 'USER' && regType === 'INDIVIDUAL';
       const loadedIsPaymentCompleted =
         loadedUser?.paymentDone === true ||
-        normalize(loadedUser?.paymentStatus) === 'SUCCESS';
+        normalize(loadedUser?.paymentStatus) === 'SUCCESS' ||
+        parsedUser?.paymentDone === true ||
+        normalize(parsedUser?.paymentStatus) === 'SUCCESS';
       const loadedIsDealerCreatedCustomer = isDealerCreated;
       const loadedShouldShowPaymentOption =
         loadedIsIndividualUser &&
         !loadedIsPaymentCompleted &&
         !loadedIsDealerCreatedCustomer;
+
+      if (loadedIsPaymentCompleted) {
+        console.log('PAYMENT ALREADY COMPLETED, REDIRECTING TO SERVICES...');
+        navigation.reset({
+          index: 0,
+          routes: [
+            {
+              name: 'Services',
+              params: {
+                userId: routeUserId || loadedUser?.id || loadedUser?.userId,
+                applicationNumber:
+                  applicationNumber ||
+                  `USER-${routeUserId || loadedUser?.id || loadedUser?.userId}`,
+              },
+            },
+          ],
+        });
+        return;
+      }
 
       console.log('USER PAYMENT CHECK =>', {
         userId: routeUserId,
@@ -223,16 +246,41 @@ const PaymentScreen = ({navigation, route}) => {
       );
       console.log('PAYMENT SUCCESS API RESPONSE =>', successResponse);
 
+      const rawUserObj = await AsyncStorage.getItem('userData');
+      if (rawUserObj) {
+        const parsedUserObj = JSON.parse(rawUserObj);
+        parsedUserObj.paymentDone = true;
+        parsedUserObj.paymentStatus = 'SUCCESS';
+        await AsyncStorage.setItem('userData', JSON.stringify(parsedUserObj));
+      }
+
+      // 3.5 Submit the application/documents to the admin now that payment is successful
+      try {
+        const appNum = applicationNumber || `USER-${currentUserId}`;
+        await api.post(`/loan/${appNum}/submit`);
+        console.log('APPLICATION SUBMITTED TO ADMIN AFTER PAYMENT');
+      } catch (submitErr) {
+        console.log('SUBMIT TO ADMIN ON PAYMENT SUCCESS ERROR =>', submitErr);
+      }
+
       Toast.show({
         type: 'success',
         text1: 'Payment successful',
         text2: 'Your payment has been recorded.',
       });
 
-      // 4. Navigate to CustomerDashboard (Home Screen of authenticated customer)
+      // 4. Navigate to Services screen (RC Verification / E-Challan)
       navigation.reset({
         index: 0,
-        routes: [{name: 'CustomerDashboard'}],
+        routes: [
+          {
+            name: 'Services',
+            params: {
+              userId: currentUserId,
+              applicationNumber: applicationNumber || `USER-${currentUserId}`,
+            },
+          },
+        ],
       });
     } catch (error) {
       console.log('PAYMENT ERROR =>', error);
@@ -395,8 +443,20 @@ const PaymentScreen = ({navigation, route}) => {
         )}
 
         <TouchableOpacity
+          style={styles.dashboardBtn}
+          onPress={() => navigation.navigate('CustomerDashboard')}>
+          <Text style={styles.dashboardBtnText}>Go to Dashboard</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
           style={styles.backBtn}
-          onPress={() => navigation.goBack()}>
+          onPress={() => {
+            if (navigation.canGoBack()) {
+              navigation.goBack();
+            } else {
+              navigation.navigate('CustomerDashboard');
+            }
+          }}>
           <Text style={styles.backBtnText}>← Previous</Text>
         </TouchableOpacity>
       </ScrollView>
@@ -503,4 +563,18 @@ const styles = StyleSheet.create({
 
   backBtn: {padding: 14, alignItems: 'center'},
   backBtnText: {color: COLORS.primary, fontWeight: '700', fontSize: 14},
+  dashboardBtn: {
+    backgroundColor: COLORS.white,
+    borderColor: COLORS.primary,
+    borderWidth: 1.5,
+    padding: 15,
+    borderRadius: RADIUS.sm,
+    alignItems: 'center',
+    marginTop: SPACING.md,
+  },
+  dashboardBtnText: {
+    color: COLORS.primary,
+    fontWeight: '800',
+    fontSize: 15,
+  },
 });

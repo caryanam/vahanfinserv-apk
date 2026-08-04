@@ -1,100 +1,110 @@
-import React, { useState } from 'react';
+import React, {useState} from 'react';
 import {
-  View, Text, StyleSheet, SafeAreaView, TouchableOpacity,
-  TextInput, ScrollView, ActivityIndicator, Alert,
+  View,
+  Text,
+  StyleSheet,
+  SafeAreaView,
+  TouchableOpacity,
+  TextInput,
+  ScrollView,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../../services/api';
-import { COLORS, SPACING, RADIUS } from '../../constants/theme';
+import {COLORS, SPACING, RADIUS} from '../../constants/theme';
 import Toast from 'react-native-toast-message';
 
-const ApplyLoanScreen = ({ navigation }) => {
+const ApplyLoanScreen = ({navigation}) => {
   const [loanAmount, setLoanAmount] = useState('');
-  const [vehicleType, setVehicleType] = useState('CAR');
+  const [vehicleType, setVehicleType] = useState('NEW CAR');
   const [loading, setLoading] = useState(false);
 
-//   const startApplication = async () => {
-//     if (!loanAmount) {
-//       Toast.show({ type: 'error', text1: 'Please enter loan amount' });
-//       return;
-//     }
+  //   const startApplication = async () => {
+  //     if (!loanAmount) {
+  //       Toast.show({ type: 'error', text1: 'Please enter loan amount' });
+  //       return;
+  //     }
 
-//     setLoading(true);
-//     try {
-//       const raw = await AsyncStorage.getItem('userData');
-//       const user = raw ? JSON.parse(raw) : null;
+  //     setLoading(true);
+  //     try {
+  //       const raw = await AsyncStorage.getItem('userData');
+  //       const user = raw ? JSON.parse(raw) : null;
 
-//       if (!user?.id) {
-//         Toast.show({ type: 'error', text1: 'User not found. Please login again.' });
-//         return;
-//       }
+  //       if (!user?.id) {
+  //         Toast.show({ type: 'error', text1: 'User not found. Please login again.' });
+  //         return;
+  //       }
 
-//       const res = await api.post(`/loan/applyByUser/${user.id}`, {
-//         loanAmount: Number(loanAmount),
-//         vehicleType,
-//       });
+  //       const res = await api.post(`/loan/applyByUser/${user.id}`, {
+  //         loanAmount: Number(loanAmount),
+  //         vehicleType,
+  //       });
 
-//       const data = res?.data?.data || res?.data || {};
-//       const applicationNumber = data.applicationNumber || data.loanNumber || data.applicationNo;
+  //       const data = res?.data?.data || res?.data || {};
+  //       const applicationNumber = data.applicationNumber || data.loanNumber || data.applicationNo;
 
-//       if (!applicationNumber) {
-//         Alert.alert('Error', 'Application number not found in response');
-//         return;
-//       }
+  //       if (!applicationNumber) {
+  //         Alert.alert('Error', 'Application number not found in response');
+  //         return;
+  //       }
 
-//       Toast.show({ type: 'success', text1: 'Application started' });
+  //       Toast.show({ type: 'success', text1: 'Application started' });
 
-//       navigation.navigate('PersonalInfo', {
-//         applicationNumber,
-//         loanAmount,
-//         vehicleType,
-//       });
-//     } catch (err) {
-//       Toast.show({
-//         type: 'error',
-//         text1: err?.response?.data?.message || 'Failed to start application',
-//       });
-//     }
-//      finally {
-//       setLoading(false);
-//     }
-//   };
-const startApplication = async () => {
-  if (!loanAmount) {
-    Toast.show({ type: 'error', text1: 'Please enter loan amount' });
-    return;
-  }
-
-  setLoading(true);
-
-  try {
-    const raw = await AsyncStorage.getItem('userData');
-    const user = raw ? JSON.parse(raw) : null;
-
-    if (!user?.id) {
-      Toast.show({ type: 'error', text1: 'User not found. Please login again.' });
+  //       navigation.navigate('PersonalInfo', {
+  //         applicationNumber,
+  //         loanAmount,
+  //         vehicleType,
+  //       });
+  //     } catch (err) {
+  //       Toast.show({
+  //         type: 'error',
+  //         text1: err?.response?.data?.message || 'Failed to start application',
+  //       });
+  //     }
+  //      finally {
+  //       setLoading(false);
+  //     }
+  //   };
+  const startApplication = async () => {
+    if (!loanAmount) {
+      Toast.show({type: 'error', text1: 'Please enter loan amount'});
       return;
     }
 
-    const applicationNumber = `USER-${user.id}`;
+    setLoading(true);
 
-    Toast.show({ type: 'success', text1: 'Application started' });
+    try {
+      const raw = await AsyncStorage.getItem('userData');
+      const user = raw ? JSON.parse(raw) : null;
 
-    navigation.navigate('PersonalInfo', {
-      userId: user.id,
-      applicationNumber,
-      loanAmount,
-      vehicleType,
-    });
-  } catch (err) {
-    Toast.show({
-      type: 'error',
-      text1: err?.message || 'Failed to start application',
-    });
-  } finally {
-    setLoading(false);
-  }
-};
+      if (!user?.id) {
+        Toast.show({
+          type: 'error',
+          text1: 'User not found. Please login again.',
+        });
+        return;
+      }
+
+      const applicationNumber = `USER-${user.id}`;
+
+      Toast.show({type: 'success', text1: 'Application started'});
+
+      navigation.navigate('PersonalInfo', {
+        userId: user.id,
+        applicationNumber,
+        loanAmount,
+        vehicleType,
+      });
+    } catch (err) {
+      Toast.show({
+        type: 'error',
+        text1: err?.message || 'Failed to start application',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -115,20 +125,29 @@ const startApplication = async () => {
 
           <Text style={styles.label}>Vehicle Type</Text>
           <View style={styles.optionRow}>
-            {['CAR', 'BIKE'].map((type) => (
+            {['NEW CAR', 'USED CAR'].map(type => (
               <TouchableOpacity
                 key={type}
-                style={[styles.optionBtn, vehicleType === type && styles.optionActive]}
-                onPress={() => setVehicleType(type)}
-              >
-                <Text style={[styles.optionText, vehicleType === type && styles.optionTextActive]}>
+                style={[
+                  styles.optionBtn,
+                  vehicleType === type && styles.optionActive,
+                ]}
+                onPress={() => setVehicleType(type)}>
+                <Text
+                  style={[
+                    styles.optionText,
+                    vehicleType === type && styles.optionTextActive,
+                  ]}>
                   {type}
                 </Text>
               </TouchableOpacity>
             ))}
           </View>
 
-          <TouchableOpacity style={styles.primaryBtn} onPress={startApplication} disabled={loading}>
+          <TouchableOpacity
+            style={styles.primaryBtn}
+            onPress={startApplication}
+            disabled={loading}>
             {loading ? (
               <ActivityIndicator color={COLORS.white} />
             ) : (
@@ -136,7 +155,9 @@ const startApplication = async () => {
             )}
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => navigation.goBack()}>
             <Text style={styles.backBtnText}>Back</Text>
           </TouchableOpacity>
         </View>
@@ -148,12 +169,26 @@ const startApplication = async () => {
 export default ApplyLoanScreen;
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: COLORS.background },
-  container: { padding: SPACING.md },
-  title: { fontSize: 24, fontWeight: '800', color: COLORS.text },
-  subtitle: { color: COLORS.textSecondary, marginTop: 4, marginBottom: SPACING.md },
-  card: { backgroundColor: COLORS.white, borderRadius: RADIUS.lg, padding: SPACING.lg },
-  label: { fontSize: 14, fontWeight: '700', color: COLORS.text, marginBottom: 8, marginTop: 12 },
+  safeArea: {flex: 1, backgroundColor: COLORS.background},
+  container: {padding: SPACING.md},
+  title: {fontSize: 24, fontWeight: '800', color: COLORS.text},
+  subtitle: {
+    color: COLORS.textSecondary,
+    marginTop: 4,
+    marginBottom: SPACING.md,
+  },
+  card: {
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.lg,
+    padding: SPACING.lg,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.text,
+    marginBottom: 8,
+    marginTop: 12,
+  },
   input: {
     borderWidth: 1,
     borderColor: COLORS.border,
@@ -162,7 +197,7 @@ const styles = StyleSheet.create({
     height: 46,
     color: COLORS.text,
   },
-  optionRow: { flexDirection: 'row', gap: 10 },
+  optionRow: {flexDirection: 'row', gap: 10},
   optionBtn: {
     flex: 1,
     borderWidth: 1,
@@ -171,9 +206,9 @@ const styles = StyleSheet.create({
     padding: 12,
     alignItems: 'center',
   },
-  optionActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
-  optionText: { color: COLORS.text, fontWeight: '700' },
-  optionTextActive: { color: COLORS.white },
+  optionActive: {backgroundColor: COLORS.primary, borderColor: COLORS.primary},
+  optionText: {color: COLORS.text, fontWeight: '700'},
+  optionTextActive: {color: COLORS.white},
   primaryBtn: {
     backgroundColor: COLORS.primary,
     padding: 15,
@@ -181,7 +216,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 24,
   },
-  primaryBtnText: { color: COLORS.white, fontWeight: '800' },
-  backBtn: { padding: 14, alignItems: 'center' },
-  backBtnText: { color: COLORS.primary, fontWeight: '700' },
+  primaryBtnText: {color: COLORS.white, fontWeight: '800'},
+  backBtn: {padding: 14, alignItems: 'center'},
+  backBtnText: {color: COLORS.primary, fontWeight: '700'},
 });

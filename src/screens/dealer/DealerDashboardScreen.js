@@ -1,28 +1,38 @@
-
-import React, { useCallback, useEffect, useState } from 'react';
+import React, {useCallback, useEffect, useState} from 'react';
 import {
-  View, Text, StyleSheet, SafeAreaView, ScrollView, FlatList,
-  TouchableOpacity, ActivityIndicator, RefreshControl, StatusBar,
-  Modal, TextInput, Alert,
+  View,
+  Text,
+  StyleSheet,
+  SafeAreaView,
+  ScrollView,
+  FlatList,
+  TouchableOpacity,
+  ActivityIndicator,
+  RefreshControl,
+  StatusBar,
+  Modal,
+  TextInput,
+  Alert,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useFocusEffect } from '@react-navigation/native';
+import {useFocusEffect} from '@react-navigation/native';
 import DocumentPicker from 'react-native-document-picker';
-import { launchCamera } from 'react-native-image-picker';
+import {launchCamera} from 'react-native-image-picker';
 import api from '../../services/api';
 import Sidebar from '../../components/common/Sidebar';
 import StatCard from '../../components/common/StatCard';
-import { sanitizeFileName } from '../../services/fileUtils';
-import { COLORS, SPACING, RADIUS } from '../../constants/theme';
+import {sanitizeFileName} from '../../services/fileUtils';
+import {COLORS, SPACING, RADIUS} from '../../constants/theme';
 import Toast from 'react-native-toast-message';
 
 const DEALER_MENU = [
-  { name: 'Dashboard', emoji: '📊' },
-  { name: 'Customers', emoji: '👥' },
-  { name: 'Add Customer', emoji: '➕' },
-  { name: 'Documents', emoji: '📄' },
-  { name: 'Reports', emoji: '📈' },
-  { name: 'Settings', emoji: '⚙️' },
+  {name: 'Dashboard', emoji: '📊'},
+  {name: 'Customers', emoji: '👥'},
+  {name: 'Add Customer', emoji: '➕'},
+  {name: 'Documents', emoji: '📄'},
+  {name: 'Reports', emoji: '📈'},
+  {name: 'Settings', emoji: '⚙️'},
+  {name: 'Legal', emoji: '⚖️'},
 ];
 
 const EMPTY_FORM = {
@@ -38,9 +48,9 @@ const DOCUMENT_GROUPS = [
     icon: '🪪',
     color: '#6366F1',
     docs: [
-      { type: 'AADHAAR_1', label: 'Aadhaar Card (Front)' },
-      { type: 'AADHAAR_2', label: 'Aadhaar Card (Back)' },
-      { type: 'PAN', label: 'PAN Card' },
+      {type: 'AADHAAR_1', label: 'Aadhaar Card (Front)'},
+      {type: 'AADHAAR_2', label: 'Aadhaar Card (Back)'},
+      {type: 'PAN', label: 'PAN Card'},
     ],
   },
   {
@@ -48,8 +58,8 @@ const DOCUMENT_GROUPS = [
     icon: '🏠',
     color: '#0EA5E9',
     docs: [
-      { type: 'LIGHT_BILL', label: 'Electricity Bill' },
-      { type: 'RENTAL_AGREEMENT', label: 'Rental Agreement' },
+      {type: 'LIGHT_BILL', label: 'Electricity Bill'},
+      {type: 'RENTAL_AGREEMENT', label: 'Rental Agreement'},
     ],
   },
   {
@@ -57,12 +67,12 @@ const DOCUMENT_GROUPS = [
     icon: '💼',
     color: '#F59E0B',
     docs: [
-      { type: 'SALARY_SLIP_1', label: 'Salary Slip (Month 1)' },
-      { type: 'SALARY_SLIP_2', label: 'Salary Slip (Month 2)' },
-      { type: 'SALARY_SLIP_3', label: 'Salary Slip (Month 3)' },
-      { type: 'BANK_STATEMENT', label: 'Bank Statement' },
-      { type: 'ITR_RETURN', label: 'ITR Return' },
-      { type: 'APPOINTMENT_LETTER', label: 'Appointment Letter' },
+      {type: 'SALARY_SLIP_1', label: 'Salary Slip (Month 1)'},
+      {type: 'SALARY_SLIP_2', label: 'Salary Slip (Month 2)'},
+      {type: 'SALARY_SLIP_3', label: 'Salary Slip (Month 3)'},
+      {type: 'BANK_STATEMENT', label: 'Bank Statement'},
+      {type: 'ITR_RETURN', label: 'ITR Return'},
+      {type: 'APPOINTMENT_LETTER', label: 'Appointment Letter'},
     ],
   },
   {
@@ -70,13 +80,13 @@ const DOCUMENT_GROUPS = [
     icon: '🚗',
     color: '#10B981',
     docs: [
-      { type: 'RC_1', label: 'RC Front' },
-      { type: 'RC_2', label: 'RC Back' },
-      { type: 'INSURANCE', label: 'Insurance Copy' },
-      { type: 'ODOMETER_READING', label: 'Odometer Reading' },
-      { type: 'CHASSIS_NUMBER', label: 'Chassis Number' },
-      { type: 'CAR_FRONT_SIDE_PHOTO', label: 'Car Front Side Photo' },
-      { type: 'CAR_BACK_SIDE_PHOTO', label: 'Car Back Side Photo' },
+      {type: 'RC_1', label: 'RC Front'},
+      {type: 'RC_2', label: 'RC Back'},
+      {type: 'INSURANCE', label: 'Insurance Copy'},
+      {type: 'ODOMETER_READING', label: 'Odometer Reading'},
+      {type: 'CHASSIS_NUMBER', label: 'Chassis Number'},
+      {type: 'CAR_FRONT_SIDE_PHOTO', label: 'Car Front Side Photo'},
+      {type: 'CAR_BACK_SIDE_PHOTO', label: 'Car Back Side Photo'},
     ],
   },
 ];
@@ -85,22 +95,42 @@ const getListFromResponse = response => {
   const root = response?.data;
   const data = root?.data ?? root;
 
-  if (Array.isArray(data)) return data;
+  if (Array.isArray(data)) {
+    return data;
+  }
 
-  if (Array.isArray(data?.users)) return data.users;
-  if (Array.isArray(data?.dealerUsers)) return data.dealerUsers;
-  if (Array.isArray(data?.customers)) return data.customers;
-  if (Array.isArray(data?.userList)) return data.userList;
-  if (Array.isArray(data?.dealerUserList)) return data.dealerUserList;
-  if (Array.isArray(data?.dealerCustomers)) return data.dealerCustomers;
-  if (Array.isArray(data?.content)) return data.content;
-  if (Array.isArray(data?.records)) return data.records;
-  if (Array.isArray(data?.data)) return data.data;
+  if (Array.isArray(data?.users)) {
+    return data.users;
+  }
+  if (Array.isArray(data?.dealerUsers)) {
+    return data.dealerUsers;
+  }
+  if (Array.isArray(data?.customers)) {
+    return data.customers;
+  }
+  if (Array.isArray(data?.userList)) {
+    return data.userList;
+  }
+  if (Array.isArray(data?.dealerUserList)) {
+    return data.dealerUserList;
+  }
+  if (Array.isArray(data?.dealerCustomers)) {
+    return data.dealerCustomers;
+  }
+  if (Array.isArray(data?.content)) {
+    return data.content;
+  }
+  if (Array.isArray(data?.records)) {
+    return data.records;
+  }
+  if (Array.isArray(data?.data)) {
+    return data.data;
+  }
 
   return [];
 };
 
-const DealerDashboardScreen = ({ navigation }) => {
+const DealerDashboardScreen = ({navigation}) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeMenu, setActiveMenu] = useState('Dashboard');
   const [loading, setLoading] = useState(true);
@@ -127,7 +157,9 @@ const DealerDashboardScreen = ({ navigation }) => {
 
   const readDealer = async () => {
     const raw = await AsyncStorage.getItem('dealerData');
-    if (!raw) return null;
+    if (!raw) {
+      return null;
+    }
 
     const dealer = JSON.parse(raw);
     setDealerData(dealer);
@@ -139,7 +171,7 @@ const DealerDashboardScreen = ({ navigation }) => {
   };
 
   useEffect(() => {
-    readDealer().catch(() => { });
+    readDealer().catch(() => {});
   }, []);
 
   const loadData = useCallback(async () => {
@@ -147,14 +179,16 @@ const DealerDashboardScreen = ({ navigation }) => {
       setLoading(true);
 
       let dealer = dealerData;
-      if (!dealer) dealer = await readDealer();
+      if (!dealer) {
+        dealer = await readDealer();
+      }
 
       const dealerCode = String(dealer?.dealerCode || '').trim();
 
       if (!dealerCode) {
         setDealerUsers([]);
         setAllDocs([]);
-        setStats({ customers: 0, pendingDocs: 0, approvedDocs: 0 });
+        setStats({customers: 0, pendingDocs: 0, approvedDocs: 0});
         return;
       }
 
@@ -175,13 +209,18 @@ const DealerDashboardScreen = ({ navigation }) => {
 
       if (users.length > 0) {
         const docResults = await Promise.allSettled(
-          users.map(user => api.get(`/documents/user/${user.userId || user.id}`)),
+          users.map(user =>
+            api.get(`/documents/user/${user.userId || user.id}`),
+          ),
         );
 
         docResults.forEach(result => {
           if (result.status === 'fulfilled') {
-            const docData = result.value?.data?.data ?? result.value?.data ?? [];
-            if (Array.isArray(docData)) docs = [...docs, ...docData];
+            const docData =
+              result.value?.data?.data ?? result.value?.data ?? [];
+            if (Array.isArray(docData)) {
+              docs = [...docs, ...docData];
+            }
           }
         });
       }
@@ -192,18 +231,25 @@ const DealerDashboardScreen = ({ navigation }) => {
       setStats({
         customers: users.length,
         pendingDocs: docs.filter(d =>
-          ['PENDING', 'UPLOADED'].includes(String(d.status || '').toUpperCase()),
+          ['PENDING', 'UPLOADED'].includes(
+            String(d.status || '').toUpperCase(),
+          ),
         ).length,
         approvedDocs: docs.filter(d =>
-          ['APPROVED', 'VERIFIED'].includes(String(d.status || '').toUpperCase()),
+          ['APPROVED', 'VERIFIED'].includes(
+            String(d.status || '').toUpperCase(),
+          ),
         ).length,
       });
     } catch (error) {
-      console.log('[Dealer] loadData failed:', error?.response?.data || error.message);
+      console.log(
+        '[Dealer] loadData failed:',
+        error?.response?.data || error.message,
+      );
       setDealerUsers([]);
       setAllDocs([]);
-      setStats({ customers: 0, pendingDocs: 0, approvedDocs: 0 });
-      Toast.show({ type: 'error', text1: 'Failed to load dealer customers' });
+      setStats({customers: 0, pendingDocs: 0, approvedDocs: 0});
+      Toast.show({type: 'error', text1: 'Failed to load dealer customers'});
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -217,28 +263,35 @@ const DealerDashboardScreen = ({ navigation }) => {
   );
 
   const handleAddCustomer = async () => {
-    const { fullName, email, mobileNumber, password } = addForm;
+    const {fullName, email, mobileNumber, password} = addForm;
 
-    if (!fullName.trim() || !email.trim() || !mobileNumber.trim() || !password.trim()) {
-      Toast.show({ type: 'error', text1: 'All fields are required' });
+    if (
+      !fullName.trim() ||
+      !email.trim() ||
+      !mobileNumber.trim() ||
+      !password.trim()
+    ) {
+      Toast.show({type: 'error', text1: 'All fields are required'});
       return;
     }
 
     const cleanMobile = mobileNumber.replace(/\D/g, '');
 
     if (!/^\d{10}$/.test(cleanMobile)) {
-      Toast.show({ type: 'error', text1: 'Mobile must be 10 digits' });
+      Toast.show({type: 'error', text1: 'Mobile must be 10 digits'});
       return;
     }
 
     let dealer = dealerData;
-    if (!dealer) dealer = await readDealer();
+    if (!dealer) {
+      dealer = await readDealer();
+    }
 
     const dealerId = dealer?.dealerId || dealer?.id || '';
     const dealerCode = String(dealer?.dealerCode || '').trim();
 
     if (!dealerCode) {
-      Toast.show({ type: 'error', text1: 'Dealer Code missing. Login again.' });
+      Toast.show({type: 'error', text1: 'Dealer Code missing. Login again.'});
       return;
     }
 
@@ -257,29 +310,41 @@ const DealerDashboardScreen = ({ navigation }) => {
         paymentStatus: 'SUBMITTED_TO_ADMIN',
       };
 
-      console.log('[Dealer] ADD CUSTOMER PAYLOAD:', JSON.stringify(payload, null, 2));
+      console.log(
+        '[Dealer] ADD CUSTOMER PAYLOAD:',
+        JSON.stringify(payload, null, 2),
+      );
 
       const res = await api.post('/user/register', payload);
       const createdUser = res.data?.data ?? res.data;
 
-      console.log('[Dealer] CREATED USER:', JSON.stringify(createdUser, null, 2));
+      console.log(
+        '[Dealer] CREATED USER:',
+        JSON.stringify(createdUser, null, 2),
+      );
 
       setAddModal(false);
       setAddForm(EMPTY_FORM);
       setNewUser(createdUser);
 
-      Toast.show({ type: 'success', text1: `Customer "${fullName.trim()}" added` });
+      Toast.show({
+        type: 'success',
+        text1: `Customer "${fullName.trim()}" added`,
+      });
 
       Alert.alert(
         'Upload Documents?',
         `Do you want to upload documents for ${fullName.trim()} now?`,
         [
-          { text: 'Later', style: 'cancel', onPress: () => loadData() },
-          { text: 'Upload Now', onPress: () => setUploadModal(true) },
+          {text: 'Later', style: 'cancel', onPress: () => loadData()},
+          {text: 'Upload Now', onPress: () => setUploadModal(true)},
         ],
       );
     } catch (error) {
-      console.log('[Dealer] add customer failed:', error?.response?.data || error.message);
+      console.log(
+        '[Dealer] add customer failed:',
+        error?.response?.data || error.message,
+      );
 
       Toast.show({
         type: 'error',
@@ -291,7 +356,9 @@ const DealerDashboardScreen = ({ navigation }) => {
   };
 
   const handlePickAndUpload = async documentType => {
-    if (!newUser) return;
+    if (!newUser) {
+      return;
+    }
 
     const userId = newUser.userId || newUser.id;
 
@@ -317,11 +384,11 @@ const DealerDashboardScreen = ({ navigation }) => {
       });
 
       await api.post('/documents/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+        headers: {'Content-Type': 'multipart/form-data'},
       });
 
-      setUploadedDocs(prev => ({ ...prev, [documentType]: true }));
-      Toast.show({ type: 'success', text1: `${documentType} uploaded` });
+      setUploadedDocs(prev => ({...prev, [documentType]: true}));
+      Toast.show({type: 'success', text1: `${documentType} uploaded`});
     } catch (error) {
       if (!DocumentPicker.isCancel(error)) {
         Toast.show({
@@ -335,7 +402,9 @@ const DealerDashboardScreen = ({ navigation }) => {
   };
 
   const handleCameraUpload = async documentType => {
-    if (!newUser) return;
+    if (!newUser) {
+      return;
+    }
 
     const userId = newUser.userId || newUser.id;
 
@@ -348,20 +417,25 @@ const DealerDashboardScreen = ({ navigation }) => {
         saveToPhotos: false,
       });
 
-      if (result.didCancel) return;
+      if (result.didCancel) {
+        return;
+      }
 
       if (result.errorCode) {
         Toast.show({
           type: 'error',
-          text1: result.errorCode === 'camera_unavailable'
-            ? 'Camera not available'
-            : result.errorMessage || 'Camera error',
+          text1:
+            result.errorCode === 'camera_unavailable'
+              ? 'Camera not available'
+              : result.errorMessage || 'Camera error',
         });
         return;
       }
 
       const asset = result.assets?.[0];
-      if (!asset) return;
+      if (!asset) {
+        return;
+      }
 
       const cleanName = sanitizeFileName(asset.fileName, documentType);
 
@@ -379,11 +453,11 @@ const DealerDashboardScreen = ({ navigation }) => {
       });
 
       await api.post('/documents/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+        headers: {'Content-Type': 'multipart/form-data'},
       });
 
-      setUploadedDocs(prev => ({ ...prev, [documentType]: true }));
-      Toast.show({ type: 'success', text1: `${documentType} uploaded` });
+      setUploadedDocs(prev => ({...prev, [documentType]: true}));
+      Toast.show({type: 'success', text1: `${documentType} uploaded`});
     } catch (error) {
       Toast.show({
         type: 'error',
@@ -402,7 +476,12 @@ const DealerDashboardScreen = ({ navigation }) => {
   };
 
   const handleLogout = async () => {
-    await AsyncStorage.multiRemove(['token', 'role', 'dealerData', 'dealerCode']);
+    await AsyncStorage.multiRemove([
+      'token',
+      'role',
+      'dealerData',
+      'dealerCode',
+    ]);
     navigation.replace('Login');
   };
 
@@ -415,14 +494,14 @@ const DealerDashboardScreen = ({ navigation }) => {
     setActiveMenu(name);
   };
 
-  const CustomerCard = ({ item }) => {
+  const CustomerCard = ({item}) => {
     const name = item.fullName || item.name || 'Customer';
 
     return (
       <View style={styles.customerCard}>
         <View style={styles.customerRow}>
-          <View style={[styles.customerAvatar, { backgroundColor: '#10B98120' }]}>
-            <Text style={[styles.customerAvatarText, { color: '#10B981' }]}>
+          <View style={[styles.customerAvatar, {backgroundColor: '#10B98120'}]}>
+            <Text style={[styles.customerAvatarText, {color: '#10B981'}]}>
               {name.charAt(0).toUpperCase()}
             </Text>
           </View>
@@ -430,10 +509,14 @@ const DealerDashboardScreen = ({ navigation }) => {
           <View style={styles.customerInfo}>
             <Text style={styles.customerName}>{name}</Text>
             <Text style={styles.customerSub}>{item.email || '—'}</Text>
-            <Text style={styles.customerSub}>{item.mobileNumber || item.mobile || '—'}</Text>
+            <Text style={styles.customerSub}>
+              {item.mobileNumber || item.mobile || '—'}
+            </Text>
 
             {item.applicationId ? (
-              <Text style={styles.customerCode}>Application: {item.applicationId}</Text>
+              <Text style={styles.customerCode}>
+                Application: {item.applicationId}
+              </Text>
             ) : null}
 
             {item.dealerCode ? (
@@ -442,12 +525,18 @@ const DealerDashboardScreen = ({ navigation }) => {
           </View>
 
           <View style={styles.customerBadges}>
-            <View style={[styles.badge, { backgroundColor: '#8B5CF618' }]}>
-              <Text style={[styles.badgeText, { color: '#8B5CF6' }]}>Dealer</Text>
+            <View style={[styles.badge, {backgroundColor: '#8B5CF618'}]}>
+              <Text style={[styles.badgeText, {color: '#8B5CF6'}]}>Dealer</Text>
             </View>
 
-            <View style={[styles.badge, { backgroundColor: '#10B98118', marginTop: 3 }]}>
-              <Text style={[styles.badgeText, { color: '#10B981' }]}>Submitted</Text>
+            <View
+              style={[
+                styles.badge,
+                {backgroundColor: '#10B98118', marginTop: 3},
+              ]}>
+              <Text style={[styles.badgeText, {color: '#10B981'}]}>
+                Submitted
+              </Text>
             </View>
           </View>
         </View>
@@ -459,33 +548,34 @@ const DealerDashboardScreen = ({ navigation }) => {
               userId: item.userId || item.id,
               userName: name,
             })
-          }
-        >
+          }>
           <Text style={styles.viewDocsBtnText}>📋 View Documents</Text>
         </TouchableOpacity>
       </View>
     );
   };
 
-  const DocCard = ({ item }) => {
+  const DocCard = ({item}) => {
     const status = String(item.status || 'PENDING').toUpperCase();
 
     const statusColor =
       status === 'APPROVED' || status === 'VERIFIED'
         ? '#10B981'
         : status === 'REJECTED'
-          ? '#EF4444'
-          : '#F59E0B';
+        ? '#EF4444'
+        : '#F59E0B';
 
     return (
       <View style={styles.docCard}>
         <View style={styles.docRow}>
-          <View style={[styles.docIcon, { backgroundColor: `${statusColor}18` }]}>
+          <View style={[styles.docIcon, {backgroundColor: `${statusColor}18`}]}>
             <Text style={styles.docIconText}>📄</Text>
           </View>
 
           <View style={styles.docInfo}>
-            <Text style={styles.docType}>{item.documentType || item.type || '—'}</Text>
+            <Text style={styles.docType}>
+              {item.documentType || item.type || '—'}
+            </Text>
             <Text style={styles.docFileName} numberOfLines={1}>
               {item.fileName || item.originalFileName || '—'}
             </Text>
@@ -494,8 +584,10 @@ const DealerDashboardScreen = ({ navigation }) => {
             </Text>
           </View>
 
-          <View style={[styles.badge, { backgroundColor: `${statusColor}18` }]}>
-            <Text style={[styles.badgeText, { color: statusColor }]}>{status}</Text>
+          <View style={[styles.badge, {backgroundColor: `${statusColor}18`}]}>
+            <Text style={[styles.badgeText, {color: statusColor}]}>
+              {status}
+            </Text>
           </View>
         </View>
       </View>
@@ -504,7 +596,13 @@ const DealerDashboardScreen = ({ navigation }) => {
 
   const renderContent = () => {
     if (loading) {
-      return <ActivityIndicator size="large" color={COLORS.accent} style={styles.center} />;
+      return (
+        <ActivityIndicator
+          size="large"
+          color={COLORS.accent}
+          style={styles.center}
+        />
+      );
     }
 
     switch (activeMenu) {
@@ -520,31 +618,52 @@ const DealerDashboardScreen = ({ navigation }) => {
                   loadData();
                 }}
               />
-            }
-          >
+            }>
             <View style={styles.welcomeCard}>
-              <View style={{ flex: 1 }}>
+              <View style={{flex: 1}}>
                 <Text style={styles.welcomeText}>
-                  Welcome, {dealerData?.name || dealerData?.fullName || 'Dealer'} 👋
+                  Welcome,{' '}
+                  {dealerData?.name || dealerData?.fullName || 'Dealer'} 👋
                 </Text>
-                <Text style={styles.welcomeSub}>Vahan Finserv Dealer Panel</Text>
+                <Text style={styles.welcomeSub}>
+                  Vahan Finserv Dealer Panel
+                </Text>
               </View>
 
               {dealerData?.dealerCode ? (
                 <View style={styles.codeChip}>
-                  <Text style={styles.codeChipText}>{dealerData.dealerCode}</Text>
+                  <Text style={styles.codeChipText}>
+                    {dealerData.dealerCode}
+                  </Text>
                 </View>
               ) : null}
             </View>
 
             <Text style={styles.sectionTitle}>Overview</Text>
 
-            <StatCard label="My Customers" value={stats.customers} emoji="👥" color={COLORS.accent} />
-            <StatCard label="Pending Documents" value={stats.pendingDocs} emoji="⏳" color="#F59E0B" />
-            <StatCard label="Approved Documents" value={stats.approvedDocs} emoji="✅" color="#10B981" />
+            <StatCard
+              label="My Customers"
+              value={stats.customers}
+              emoji="👥"
+              color={COLORS.accent}
+            />
+            <StatCard
+              label="Pending Documents"
+              value={stats.pendingDocs}
+              emoji="⏳"
+              color="#F59E0B"
+            />
+            <StatCard
+              label="Approved Documents"
+              value={stats.approvedDocs}
+              emoji="✅"
+              color="#10B981"
+            />
 
-            <TouchableOpacity style={styles.addCustomerBtn} onPress={() => setAddModal(true)}>
-              <Text style={styles.addCustomerBtnText}>➕  Add New Customer</Text>
+            <TouchableOpacity
+              style={styles.addCustomerBtn}
+              onPress={() => setAddModal(true)}>
+              <Text style={styles.addCustomerBtnText}>➕ Add New Customer</Text>
             </TouchableOpacity>
 
             {dealerUsers.length > 0 ? (
@@ -558,8 +677,7 @@ const DealerDashboardScreen = ({ navigation }) => {
                 {dealerUsers.length > 3 ? (
                   <TouchableOpacity
                     style={styles.viewAllBtn}
-                    onPress={() => setActiveMenu('Customers')}
-                  >
+                    onPress={() => setActiveMenu('Customers')}>
                     <Text style={styles.viewAllBtnText}>
                       View All {dealerUsers.length} Customers →
                     </Text>
@@ -579,9 +697,13 @@ const DealerDashboardScreen = ({ navigation }) => {
         return (
           <View style={styles.flex}>
             <View style={styles.listHeader}>
-              <Text style={styles.sectionTitle}>My Customers ({dealerUsers.length})</Text>
+              <Text style={styles.sectionTitle}>
+                My Customers ({dealerUsers.length})
+              </Text>
 
-              <TouchableOpacity style={styles.addBtnSmall} onPress={() => setAddModal(true)}>
+              <TouchableOpacity
+                style={styles.addBtnSmall}
+                onPress={() => setAddModal(true)}>
                 <Text style={styles.addBtnSmallText}>+ Add</Text>
               </TouchableOpacity>
             </View>
@@ -589,7 +711,7 @@ const DealerDashboardScreen = ({ navigation }) => {
             <FlatList
               data={dealerUsers}
               keyExtractor={(item, i) => String(item.userId || item.id || i)}
-              renderItem={({ item }) => <CustomerCard item={item} />}
+              renderItem={({item}) => <CustomerCard item={item} />}
               refreshControl={
                 <RefreshControl
                   refreshing={refreshing}
@@ -605,7 +727,7 @@ const DealerDashboardScreen = ({ navigation }) => {
                   <Text style={styles.emptyText}>No customers yet.</Text>
                 </View>
               }
-              contentContainerStyle={{ paddingBottom: SPACING.xl }}
+              contentContainerStyle={{paddingBottom: SPACING.xl}}
             />
           </View>
         );
@@ -613,12 +735,16 @@ const DealerDashboardScreen = ({ navigation }) => {
       case 'Documents':
         return (
           <View style={styles.flex}>
-            <Text style={styles.sectionTitle}>Customer Documents ({allDocs.length})</Text>
+            <Text style={styles.sectionTitle}>
+              Customer Documents ({allDocs.length})
+            </Text>
 
             <FlatList
               data={allDocs}
-              keyExtractor={(item, i) => String(item.documentId || item.id || i)}
-              renderItem={({ item }) => <DocCard item={item} />}
+              keyExtractor={(item, i) =>
+                String(item.documentId || item.id || i)
+              }
+              renderItem={({item}) => <DocCard item={item} />}
               refreshControl={
                 <RefreshControl
                   refreshing={refreshing}
@@ -634,7 +760,7 @@ const DealerDashboardScreen = ({ navigation }) => {
                   <Text style={styles.emptyText}>No documents found.</Text>
                 </View>
               }
-              contentContainerStyle={{ paddingBottom: SPACING.xl }}
+              contentContainerStyle={{paddingBottom: SPACING.xl}}
             />
           </View>
         );
@@ -643,9 +769,24 @@ const DealerDashboardScreen = ({ navigation }) => {
         return (
           <ScrollView>
             <Text style={styles.sectionTitle}>Reports</Text>
-            <StatCard label="Total Customers" value={stats.customers} emoji="👥" color={COLORS.accent} />
-            <StatCard label="Pending Documents" value={stats.pendingDocs} emoji="⏳" color="#F59E0B" />
-            <StatCard label="Approved Documents" value={stats.approvedDocs} emoji="✅" color="#10B981" />
+            <StatCard
+              label="Total Customers"
+              value={stats.customers}
+              emoji="👥"
+              color={COLORS.accent}
+            />
+            <StatCard
+              label="Pending Documents"
+              value={stats.pendingDocs}
+              emoji="⏳"
+              color="#F59E0B"
+            />
+            <StatCard
+              label="Approved Documents"
+              value={stats.approvedDocs}
+              emoji="✅"
+              color="#10B981"
+            />
           </ScrollView>
         );
 
@@ -672,6 +813,58 @@ const DealerDashboardScreen = ({ navigation }) => {
           </ScrollView>
         );
 
+      case 'Legal':
+        return (
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <Text style={styles.sectionTitle}>Legal & Compliance</Text>
+            <Text style={styles.sectionSubtitle}>
+              Please select a policy or contact option to read more details.
+            </Text>
+
+            {[
+              {
+                title: 'Privacy Policy',
+                desc: 'How we collect, use, and safeguard your data.',
+                icon: '🛡️',
+                screen: 'PrivacyPolicy',
+              },
+              {
+                title: 'Terms & Conditions',
+                desc: 'User eligibility, responsibilities, and disclosures.',
+                icon: '📝',
+                screen: 'TermsConditions',
+              },
+              {
+                title: 'No Refund Policy',
+                desc: 'Detailed payment and processing fee terms.',
+                icon: '💳',
+                screen: 'RefundPolicy',
+              },
+              {
+                title: 'Contact Us',
+                desc: 'Vahan Finserv support channels and details.',
+                icon: '📞',
+                screen: 'ContactUs',
+              },
+            ].map((item, index) => (
+              <TouchableOpacity
+                key={index}
+                style={styles.legalMenuCard}
+                onPress={() => navigation.navigate(item.screen)}
+                activeOpacity={0.8}>
+                <View style={styles.legalMenuIconBox}>
+                  <Text style={styles.legalMenuIcon}>{item.icon}</Text>
+                </View>
+                <View style={styles.legalMenuText}>
+                  <Text style={styles.legalMenuCardTitle}>{item.title}</Text>
+                  <Text style={styles.legalMenuCardDesc}>{item.desc}</Text>
+                </View>
+                <Text style={styles.legalMenuArrow}>→</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        );
+
       default:
         return null;
     }
@@ -692,7 +885,9 @@ const DealerDashboardScreen = ({ navigation }) => {
       />
 
       <View style={styles.topBar}>
-        <TouchableOpacity onPress={() => setSidebarOpen(true)} style={styles.menuBtn}>
+        <TouchableOpacity
+          onPress={() => setSidebarOpen(true)}
+          style={styles.menuBtn}>
           <Text style={styles.menuBtnText}>☰</Text>
         </TouchableOpacity>
 
@@ -703,14 +898,15 @@ const DealerDashboardScreen = ({ navigation }) => {
             setRefreshing(true);
             loadData();
           }}
-          style={styles.refreshBtn}
-        >
+          style={styles.refreshBtn}>
           <Text style={styles.refreshBtnText}>↻</Text>
         </TouchableOpacity>
 
         <View style={styles.avatarCircle}>
           <Text style={styles.avatarText}>
-            {(dealerData?.name || dealerData?.fullName || 'D').charAt(0).toUpperCase()}
+            {(dealerData?.name || dealerData?.fullName || 'D')
+              .charAt(0)
+              .toUpperCase()}
           </Text>
         </View>
       </View>
@@ -722,8 +918,7 @@ const DealerDashboardScreen = ({ navigation }) => {
           <ScrollView
             style={styles.modalBox}
             contentContainerStyle={styles.modalContent}
-            keyboardShouldPersistTaps="handled"
-          >
+            keyboardShouldPersistTaps="handled">
             <Text style={styles.modalTitle}>➕ Add New Customer</Text>
 
             <Text style={styles.modalSub}>
@@ -732,18 +927,38 @@ const DealerDashboardScreen = ({ navigation }) => {
             </Text>
 
             {[
-              { key: 'fullName', label: 'Full Name *', keyboard: 'default', secure: false },
-              { key: 'email', label: 'Email *', keyboard: 'email-address', secure: false },
-              { key: 'mobileNumber', label: 'Mobile Number *', keyboard: 'phone-pad', secure: false },
-              { key: 'password', label: 'Password *', keyboard: 'default', secure: true },
-            ].map(({ key, label, keyboard, secure }) => (
+              {
+                key: 'fullName',
+                label: 'Full Name *',
+                keyboard: 'default',
+                secure: false,
+              },
+              {
+                key: 'email',
+                label: 'Email *',
+                keyboard: 'email-address',
+                secure: false,
+              },
+              {
+                key: 'mobileNumber',
+                label: 'Mobile Number *',
+                keyboard: 'phone-pad',
+                secure: false,
+              },
+              {
+                key: 'password',
+                label: 'Password *',
+                keyboard: 'default',
+                secure: true,
+              },
+            ].map(({key, label, keyboard, secure}) => (
               <View key={key}>
                 <Text style={styles.inputLabel}>{label}</Text>
 
                 <TextInput
                   style={styles.input}
                   value={addForm[key]}
-                  onChangeText={v => setAddForm(f => ({ ...f, [key]: v }))}
+                  onChangeText={v => setAddForm(f => ({...f, [key]: v}))}
                   placeholder={label.replace(' *', '')}
                   placeholderTextColor={COLORS.textMuted}
                   keyboardType={keyboard}
@@ -755,11 +970,15 @@ const DealerDashboardScreen = ({ navigation }) => {
 
             <View style={styles.infoRow}>
               <Text style={styles.infoText}>
-                🏦 Dealer Code: <Text style={styles.infoValue}>{dealerData?.dealerCode || '—'}</Text>
+                🏦 Dealer Code:{' '}
+                <Text style={styles.infoValue}>
+                  {dealerData?.dealerCode || '—'}
+                </Text>
               </Text>
 
               <Text style={styles.infoText}>
-                🔖 Registration Type: <Text style={styles.infoValue}>DEALER</Text>
+                🔖 Registration Type:{' '}
+                <Text style={styles.infoValue}>DEALER</Text>
               </Text>
 
               <Text style={styles.infoText}>
@@ -774,16 +993,14 @@ const DealerDashboardScreen = ({ navigation }) => {
                   setAddModal(false);
                   setAddForm(EMPTY_FORM);
                 }}
-                disabled={addLoading}
-              >
+                disabled={addLoading}>
                 <Text style={styles.modalCancelText}>Cancel</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={[styles.modalBtn, styles.modalSaveBtn]}
                 onPress={handleAddCustomer}
-                disabled={addLoading}
-              >
+                disabled={addLoading}>
                 {addLoading ? (
                   <ActivityIndicator size="small" color={COLORS.primary} />
                 ) : (
@@ -800,7 +1017,7 @@ const DealerDashboardScreen = ({ navigation }) => {
           <View style={styles.uploadContainer}>
             {/* Header */}
             <View style={styles.uploadHeader}>
-              <View style={{ flex: 1 }}>
+              <View style={{flex: 1}}>
                 <Text style={styles.uploadTitle}>📄 Upload Documents</Text>
                 <Text style={styles.uploadCustomerName}>
                   Customer: {newUser?.fullName || newUser?.name || '—'}
@@ -808,8 +1025,7 @@ const DealerDashboardScreen = ({ navigation }) => {
               </View>
               <TouchableOpacity
                 style={styles.uploadCloseBtn}
-                onPress={finishUpload}
-              >
+                onPress={finishUpload}>
                 <Text style={styles.uploadCloseBtnText}>✕</Text>
               </TouchableOpacity>
             </View>
@@ -818,7 +1034,8 @@ const DealerDashboardScreen = ({ navigation }) => {
             <View style={styles.uploadProgressRow}>
               <Text style={styles.uploadProgressText}>
                 {Object.keys(uploadedDocs).length} of{' '}
-                {DOCUMENT_GROUPS.reduce((sum, g) => sum + g.docs.length, 0)} uploaded
+                {DOCUMENT_GROUPS.reduce((sum, g) => sum + g.docs.length, 0)}{' '}
+                uploaded
               </Text>
               <View style={styles.uploadProgressBar}>
                 <View
@@ -827,7 +1044,10 @@ const DealerDashboardScreen = ({ navigation }) => {
                     {
                       width: `${(
                         (Object.keys(uploadedDocs).length /
-                          DOCUMENT_GROUPS.reduce((sum, g) => sum + g.docs.length, 0)) *
+                          DOCUMENT_GROUPS.reduce(
+                            (sum, g) => sum + g.docs.length,
+                            0,
+                          )) *
                         100
                       ).toFixed(0)}%`,
                     },
@@ -840,16 +1060,22 @@ const DealerDashboardScreen = ({ navigation }) => {
             <ScrollView
               style={styles.uploadScrollArea}
               showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingBottom: SPACING.lg }}
-            >
+              contentContainerStyle={{paddingBottom: SPACING.lg}}>
               {DOCUMENT_GROUPS.map((group, gIdx) => (
-                <View key={group.title} style={gIdx > 0 ? { marginTop: SPACING.md } : undefined}>
+                <View
+                  key={group.title}
+                  style={gIdx > 0 ? {marginTop: SPACING.md} : undefined}>
                   {/* Section header */}
                   <View style={styles.uploadSectionHeader}>
-                    <View style={[styles.uploadSectionIcon, { backgroundColor: `${group.color}15` }]}>
-                      <Text style={{ fontSize: 18 }}>{group.icon}</Text>
+                    <View
+                      style={[
+                        styles.uploadSectionIcon,
+                        {backgroundColor: `${group.color}15`},
+                      ]}>
+                      <Text style={{fontSize: 18}}>{group.icon}</Text>
                     </View>
-                    <Text style={[styles.uploadSectionTitle, { color: group.color }]}>
+                    <Text
+                      style={[styles.uploadSectionTitle, {color: group.color}]}>
                       {group.title}
                     </Text>
                     <View style={styles.uploadSectionLine} />
@@ -865,17 +1091,25 @@ const DealerDashboardScreen = ({ navigation }) => {
                         style={[
                           styles.uploadDocRow,
                           isUploaded && styles.uploadDocRowDone,
-                          dIdx === group.docs.length - 1 && { borderBottomWidth: 0 },
-                        ]}
-                      >
+                          dIdx === group.docs.length - 1 && {
+                            borderBottomWidth: 0,
+                          },
+                        ]}>
                         <View style={styles.uploadDocInfo}>
                           {isUploaded ? (
                             <View style={styles.uploadDocCheck}>
-                              <Text style={{ fontSize: 12, color: '#fff' }}>✓</Text>
+                              <Text style={{fontSize: 12, color: '#fff'}}>
+                                ✓
+                              </Text>
                             </View>
                           ) : (
                             <View style={styles.uploadDocBullet}>
-                              <View style={[styles.uploadDocBulletInner, { backgroundColor: group.color }]} />
+                              <View
+                                style={[
+                                  styles.uploadDocBulletInner,
+                                  {backgroundColor: group.color},
+                                ]}
+                              />
                             </View>
                           )}
                           <Text
@@ -883,8 +1117,7 @@ const DealerDashboardScreen = ({ navigation }) => {
                               styles.uploadDocLabel,
                               isUploaded && styles.uploadDocLabelDone,
                             ]}
-                            numberOfLines={1}
-                          >
+                            numberOfLines={1}>
                             {doc.label}
                           </Text>
                         </View>
@@ -896,8 +1129,7 @@ const DealerDashboardScreen = ({ navigation }) => {
                               isUploaded && styles.uploadDocBtnDisabled,
                             ]}
                             disabled={uploading}
-                            onPress={() => handleCameraUpload(doc.type)}
-                          >
+                            onPress={() => handleCameraUpload(doc.type)}>
                             <Text style={styles.uploadDocCameraBtnText}>
                               {uploading ? '⏳' : '📷'}
                             </Text>
@@ -908,8 +1140,7 @@ const DealerDashboardScreen = ({ navigation }) => {
                               isUploaded && styles.uploadDocBtnDisabled,
                             ]}
                             disabled={uploading}
-                            onPress={() => handlePickAndUpload(doc.type)}
-                          >
+                            onPress={() => handlePickAndUpload(doc.type)}>
                             <Text style={styles.uploadDocFilesBtnText}>
                               {uploading ? '⏳' : '📁'} Files
                             </Text>
@@ -926,8 +1157,7 @@ const DealerDashboardScreen = ({ navigation }) => {
             <View style={styles.uploadFooter}>
               <TouchableOpacity
                 style={styles.uploadDoneBtn}
-                onPress={finishUpload}
-              >
+                onPress={finishUpload}>
                 <Text style={styles.uploadDoneBtnText}>Done ✓</Text>
               </TouchableOpacity>
             </View>
@@ -939,8 +1169,8 @@ const DealerDashboardScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: COLORS.primary },
-  flex: { flex: 1 },
+  safeArea: {flex: 1, backgroundColor: COLORS.primary},
+  flex: {flex: 1},
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -950,11 +1180,11 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     gap: SPACING.sm,
   },
-  menuBtn: { padding: SPACING.xs },
-  menuBtnText: { color: COLORS.white, fontSize: 22 },
-  pageTitle: { flex: 1, color: COLORS.white, fontSize: 18, fontWeight: '700' },
-  refreshBtn: { padding: SPACING.xs },
-  refreshBtnText: { color: COLORS.accent, fontSize: 22, fontWeight: '700' },
+  menuBtn: {padding: SPACING.xs},
+  menuBtnText: {color: COLORS.white, fontSize: 22},
+  pageTitle: {flex: 1, color: COLORS.white, fontSize: 18, fontWeight: '700'},
+  refreshBtn: {padding: SPACING.xs},
+  refreshBtnText: {color: COLORS.accent, fontSize: 22, fontWeight: '700'},
   avatarCircle: {
     width: 36,
     height: 36,
@@ -963,9 +1193,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarText: { color: COLORS.primary, fontWeight: '800', fontSize: 14 },
-  content: { flex: 1, backgroundColor: COLORS.background, padding: SPACING.md },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: SPACING.xxl },
+  avatarText: {color: COLORS.primary, fontWeight: '800', fontSize: 14},
+  content: {flex: 1, backgroundColor: COLORS.background, padding: SPACING.md},
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: SPACING.xxl,
+  },
   welcomeCard: {
     backgroundColor: COLORS.primary,
     borderRadius: RADIUS.lg,
@@ -974,8 +1209,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  welcomeText: { color: COLORS.white, fontSize: 17, fontWeight: '700' },
-  welcomeSub: { color: '#8fa3c7', fontSize: 12, marginTop: 3 },
+  welcomeText: {color: COLORS.white, fontSize: 17, fontWeight: '700'},
+  welcomeSub: {color: '#8fa3c7', fontSize: 12, marginTop: 3},
   codeChip: {
     backgroundColor: `${COLORS.accent}30`,
     borderRadius: RADIUS.sm,
@@ -983,7 +1218,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     marginLeft: SPACING.sm,
   },
-  codeChipText: { color: COLORS.accent, fontSize: 13, fontWeight: '800' },
+  codeChipText: {color: COLORS.accent, fontSize: 13, fontWeight: '800'},
   sectionTitle: {
     fontSize: 15,
     fontWeight: '700',
@@ -999,7 +1234,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
     elevation: 3,
   },
-  addCustomerBtnText: { color: COLORS.primary, fontWeight: '800', fontSize: 15 },
+  addCustomerBtnText: {color: COLORS.primary, fontWeight: '800', fontSize: 15},
   viewAllBtn: {
     backgroundColor: `${COLORS.primary}15`,
     borderRadius: RADIUS.md,
@@ -1009,7 +1244,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: `${COLORS.primary}30`,
   },
-  viewAllBtnText: { color: COLORS.primary, fontWeight: '700', fontSize: 13 },
+  viewAllBtnText: {color: COLORS.primary, fontWeight: '700', fontSize: 13},
   customerCard: {
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.md,
@@ -1017,7 +1252,11 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
     elevation: 2,
   },
-  customerRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SPACING.sm },
+  customerRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: SPACING.sm,
+  },
   customerAvatar: {
     width: 44,
     height: 44,
@@ -1025,14 +1264,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  customerAvatarText: { fontWeight: '800', fontSize: 17 },
-  customerInfo: { flex: 1 },
-  customerName: { fontSize: 14, fontWeight: '700', color: COLORS.text },
-  customerSub: { fontSize: 12, color: COLORS.textSecondary, marginTop: 1 },
-  customerCode: { fontSize: 11, color: COLORS.textMuted, marginTop: 2 },
-  customerBadges: { alignItems: 'flex-end' },
-  badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: RADIUS.sm },
-  badgeText: { fontSize: 10, fontWeight: '700' },
+  customerAvatarText: {fontWeight: '800', fontSize: 17},
+  customerInfo: {flex: 1},
+  customerName: {fontSize: 14, fontWeight: '700', color: COLORS.text},
+  customerSub: {fontSize: 12, color: COLORS.textSecondary, marginTop: 1},
+  customerCode: {fontSize: 11, color: COLORS.textMuted, marginTop: 2},
+  customerBadges: {alignItems: 'flex-end'},
+  badge: {paddingHorizontal: 8, paddingVertical: 3, borderRadius: RADIUS.sm},
+  badgeText: {fontSize: 10, fontWeight: '700'},
   viewDocsBtn: {
     marginTop: SPACING.sm,
     paddingVertical: 8,
@@ -1042,7 +1281,7 @@ const styles = StyleSheet.create({
     borderColor: COLORS.accent,
     alignItems: 'center',
   },
-  viewDocsBtnText: { color: COLORS.accent, fontSize: 12, fontWeight: '700' },
+  viewDocsBtnText: {color: COLORS.accent, fontSize: 12, fontWeight: '700'},
   docCard: {
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.md,
@@ -1050,7 +1289,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
     elevation: 1,
   },
-  docRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
+  docRow: {flexDirection: 'row', alignItems: 'center', gap: SPACING.sm},
   docIcon: {
     width: 40,
     height: 40,
@@ -1058,11 +1297,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  docIconText: { fontSize: 20 },
-  docInfo: { flex: 1 },
-  docType: { fontSize: 13, fontWeight: '700', color: COLORS.text },
-  docFileName: { fontSize: 11, color: COLORS.textSecondary, marginTop: 1 },
-  docUser: { fontSize: 11, color: COLORS.textMuted, marginTop: 1 },
+  docIconText: {fontSize: 20},
+  docInfo: {flex: 1},
+  docType: {fontSize: 13, fontWeight: '700', color: COLORS.text},
+  docFileName: {fontSize: 11, color: COLORS.textSecondary, marginTop: 1},
+  docUser: {fontSize: 11, color: COLORS.textMuted, marginTop: 1},
   listHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1075,9 +1314,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.md,
     paddingVertical: 6,
   },
-  addBtnSmallText: { color: COLORS.primary, fontSize: 12, fontWeight: '700' },
-  emptyEmoji: { fontSize: 48, marginBottom: SPACING.md },
-  emptyText: { fontSize: 14, color: COLORS.textSecondary, marginBottom: SPACING.md },
+  addBtnSmallText: {color: COLORS.primary, fontSize: 12, fontWeight: '700'},
+  emptyEmoji: {fontSize: 48, marginBottom: SPACING.md},
+  emptyText: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.md,
+  },
   settingsCard: {
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.md,
@@ -1091,7 +1334,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
   },
-  settingsLabel: { fontSize: 13, color: COLORS.textSecondary },
+  settingsLabel: {fontSize: 13, color: COLORS.textSecondary},
   settingsValue: {
     fontSize: 13,
     fontWeight: '600',
@@ -1099,22 +1342,31 @@ const styles = StyleSheet.create({
     maxWidth: '55%',
     textAlign: 'right',
   },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
   modalBox: {
     backgroundColor: COLORS.white,
     borderTopLeftRadius: RADIUS.xl,
     borderTopRightRadius: RADIUS.xl,
     maxHeight: '92%',
   },
-  modalContent: { padding: SPACING.lg },
-  modalTitle: { fontSize: 17, fontWeight: '700', color: COLORS.text, marginBottom: 4 },
+  modalContent: {padding: SPACING.lg},
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: COLORS.text,
+    marginBottom: 4,
+  },
   modalSub: {
     fontSize: 13,
     color: COLORS.textSecondary,
     marginBottom: SPACING.md,
     lineHeight: 19,
   },
-  inputLabel: { fontSize: 12, color: COLORS.textSecondary, marginBottom: 4 },
+  inputLabel: {fontSize: 12, color: COLORS.textSecondary, marginBottom: 4},
   input: {
     borderWidth: 1,
     borderColor: COLORS.border,
@@ -1132,9 +1384,9 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
     gap: 4,
   },
-  infoText: { fontSize: 12, color: COLORS.textSecondary },
-  infoValue: { fontWeight: '700', color: COLORS.primary },
-  modalActions: { flexDirection: 'row', gap: SPACING.sm, marginTop: SPACING.xs },
+  infoText: {fontSize: 12, color: COLORS.textSecondary},
+  infoValue: {fontWeight: '700', color: COLORS.primary},
+  modalActions: {flexDirection: 'row', gap: SPACING.sm, marginTop: SPACING.xs},
   modalBtn: {
     flex: 1,
     paddingVertical: 12,
@@ -1147,9 +1399,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
   },
-  modalCancelText: { color: COLORS.text, fontWeight: '600' },
-  modalSaveBtn: { backgroundColor: COLORS.accent },
-  modalSaveText: { color: COLORS.primary, fontWeight: '700' },
+  modalCancelText: {color: COLORS.text, fontWeight: '600'},
+  modalSaveBtn: {backgroundColor: COLORS.accent},
+  modalSaveText: {color: COLORS.primary, fontWeight: '700'},
   // ── Upload Modal Styles ──
   uploadOverlay: {
     flex: 1,
@@ -1341,6 +1593,57 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     fontWeight: '800',
     fontSize: 15,
+  },
+  sectionSubtitle: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.md,
+    lineHeight: 18,
+  },
+  legalMenuCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
+    marginBottom: SPACING.sm,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowOffset: {width: 0, height: 1},
+    shadowRadius: 3,
+  },
+  legalMenuIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: RADIUS.sm,
+    backgroundColor: `${COLORS.accent}15`,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: SPACING.md,
+  },
+  legalMenuIcon: {
+    fontSize: 20,
+  },
+  legalMenuText: {
+    flex: 1,
+  },
+  legalMenuCardTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: COLORS.text,
+  },
+  legalMenuCardDesc: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
+  legalMenuArrow: {
+    fontSize: 18,
+    color: COLORS.textMuted,
+    fontWeight: '800',
   },
 });
 

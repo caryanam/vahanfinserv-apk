@@ -1,4 +1,4 @@
-package com.tempfinservapp
+package tempfinservapp.com
 
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate

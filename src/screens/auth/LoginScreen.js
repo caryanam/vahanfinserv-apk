@@ -1003,32 +1003,12 @@ const LoginScreen = ({navigation}) => {
         await AsyncStorage.setItem('userData', JSON.stringify(userObject));
 
         try {
-          const profile = await getUserProfile(id);
-          const regType = String(profile?.registrationType || '')
-            .toUpperCase()
-            .trim();
-          const isPaid =
-            profile?.paymentDone === true ||
-            String(profile?.paymentStatus || '')
-              .toUpperCase()
-              .trim() === 'SUCCESS';
+          await getUserProfile(id);
 
           Toast.show({type: 'success', text1: 'Login Successful'});
 
-          if (regType === 'INDIVIDUAL' && !isPaid) {
-            navigation.reset({
-              index: 0,
-              routes: [
-                {
-                  name: 'Payment',
-                  params: {userId: id, applicationNumber: `USER-${id}`},
-                },
-              ],
-            });
-          } else {
-            // DEALER or already paid INDIVIDUAL users continue directly to dashboard
-            navigation.reset({index: 0, routes: [{name: 'CustomerDashboard'}]});
-          }
+          // Redirect to CustomerDashboard directly; payment is accessible via the dashboard
+          navigation.reset({index: 0, routes: [{name: 'CustomerDashboard'}]});
         } catch (fetchErr) {
           console.log('LOGIN PROFILE FETCH ERROR =>', fetchErr);
           // Fallback to customer dashboard if fetch fails

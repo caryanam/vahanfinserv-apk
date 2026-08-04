@@ -153,13 +153,6 @@ const VerifySubmitScreen = ({navigation, route}) => {
   const submitApplication = async () => {
     setSubmitting(true);
     try {
-      await api.post(`/loan/${applicationNumber}/submit`);
-    } catch {
-      // endpoint may not exist — proceed anyway
-    }
-    Toast.show({type: 'success', text1: 'Application verified successfully'});
-
-    try {
       const response = await api.get(`/user/${userId}`);
       const profile = response.data?.data || response.data || {};
       const regType = String(profile?.registrationType || '')
@@ -174,19 +167,31 @@ const VerifySubmitScreen = ({navigation, route}) => {
 
       if (regType === 'DEALER' || isDealerCreated) {
         console.log('SKIPPING PAYMENT FOR DEALER/DEALER-CREATED CUSTOMER...');
+        try {
+          await api.post(`/loan/${applicationNumber}/submit`);
+        } catch {
+          // endpoint may not exist — proceed anyway
+        }
+        Toast.show({
+          type: 'success',
+          text1: 'Application verified successfully',
+        });
         navigation.reset({
           index: 0,
           routes: [{name: 'CustomerDashboard'}],
         });
       } else {
+        // Individual users must pay before application is submitted to the admin
+        Toast.show({type: 'success', text1: 'Application verified'});
         navigation.navigate('Payment', {applicationNumber, userId});
       }
     } catch (err) {
       console.log('VERIFY SUBMIT SCREEN PROFILE FETCH ERROR =>', err);
       // Fallback
       navigation.navigate('Payment', {applicationNumber, userId});
+    } finally {
+      setSubmitting(false);
     }
-    setSubmitting(false);
   };
 
   const docsByType = documents.reduce((acc, d) => {

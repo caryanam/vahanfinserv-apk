@@ -1,8 +1,8 @@
 // src/navigation/AppNavigator.js
 import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { setNavigationCallback } from '../services/api';
+import {NavigationContainer} from '@react-navigation/native';
+import {createNativeStackNavigator} from '@react-navigation/native-stack';
+import {setNavigationCallback} from '../services/api';
 
 // Home
 import HomeScreen from '../screens/home/HomeScreen';
@@ -37,15 +37,24 @@ import VehicleDocumentsScreen from '../screens/customer/VehicleDocumentsScreen';
 import VerifySubmitScreen from '../screens/customer/VerifySubmitScreen';
 import PaymentScreen from '../screens/customer/PaymentScreen';
 import LoanStatusScreen from '../screens/customer/LoanStatusScreen';
+import ServicesScreen from '../screens/customer/ServicesScreen';
+import RCVerificationScreen from '../screens/customer/RCVerificationScreen';
+import EChallanScreen from '../screens/customer/EChallanScreen';
+
+// Legal compliance screens
+import PrivacyPolicyScreen from '../screens/legal/PrivacyPolicyScreen';
+import TermsConditionsScreen from '../screens/legal/TermsConditionsScreen';
+import RefundPolicyScreen from '../screens/legal/RefundPolicyScreen';
+import ContactUsScreen from '../screens/legal/ContactUsScreen';
 
 const Stack = createNativeStackNavigator();
 
-const AppNavigator = ({ navigationRef }) => {
+const AppNavigator = ({navigationRef}) => {
   // Set up global 403 error handler callback
   React.useEffect(() => {
     if (navigationRef) {
       setNavigationCallback(() => {
-        navigationRef.current?.reset({ index: 0, routes: [{ name: 'Login' }] });
+        navigationRef.current?.reset({index: 0, routes: [{name: 'Login'}]});
       });
     }
   }, [navigationRef]);
@@ -54,8 +63,7 @@ const AppNavigator = ({ navigationRef }) => {
     <NavigationContainer ref={navigationRef}>
       <Stack.Navigator
         initialRouteName="Home"
-        screenOptions={{ headerShown: false }}
-      >
+        screenOptions={{headerShown: false}}>
         {/* Landing */}
         <Stack.Screen name="Home" component={HomeScreen} />
 
@@ -78,19 +86,43 @@ const AppNavigator = ({ navigationRef }) => {
         <Stack.Screen name="AdminSettings" component={AdminSettingsScreen} />
 
         {/* Dashboards */}
-        <Stack.Screen name="CustomerDashboard" component={CustomerDashboardScreen} />
-        <Stack.Screen name="DealerDashboard" component={DealerDashboardScreen} />
+        <Stack.Screen
+          name="CustomerDashboard"
+          component={CustomerDashboardScreen}
+        />
+        <Stack.Screen
+          name="DealerDashboard"
+          component={DealerDashboardScreen}
+        />
 
         {/* Customer Loan Flow */}
         <Stack.Screen name="ApplyLoan" component={ApplyLoanScreen} />
         <Stack.Screen name="PersonalInfo" component={PersonalInfoScreen} />
         <Stack.Screen name="KycUpload" component={KycUploadScreen} />
-        <Stack.Screen name="ResidentialInfo" component={ResidentialInfoScreen} />
+        <Stack.Screen
+          name="ResidentialInfo"
+          component={ResidentialInfoScreen}
+        />
         <Stack.Screen name="IncomeInfo" component={IncomeInfoScreen} />
-        <Stack.Screen name="VehicleDocuments" component={VehicleDocumentsScreen} />
+        <Stack.Screen
+          name="VehicleDocuments"
+          component={VehicleDocumentsScreen}
+        />
         <Stack.Screen name="VerifySubmit" component={VerifySubmitScreen} />
         <Stack.Screen name="Payment" component={PaymentScreen} />
         <Stack.Screen name="LoanStatus" component={LoanStatusScreen} />
+        <Stack.Screen name="Services" component={ServicesScreen} />
+        <Stack.Screen name="RCVerification" component={RCVerificationScreen} />
+        <Stack.Screen name="EChallan" component={EChallanScreen} />
+
+        {/* Legal compliant screens */}
+        <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
+        <Stack.Screen
+          name="TermsConditions"
+          component={TermsConditionsScreen}
+        />
+        <Stack.Screen name="RefundPolicy" component={RefundPolicyScreen} />
+        <Stack.Screen name="ContactUs" component={ContactUsScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
