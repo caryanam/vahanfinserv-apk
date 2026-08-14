@@ -7,12 +7,10 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
-  Image,
-  Modal,
-  Linking,
 } from 'react-native';
 import api from '../../services/api';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import {downloadDocumentToStorage} from '../../services/documentService';
+import DocumentPreviewModal from '../../components/common/DocumentPreviewModal';
 import Toast from 'react-native-toast-message';
 import {COLORS, SPACING, RADIUS} from '../../constants/theme';
 
@@ -91,7 +89,7 @@ const VerifySubmitScreen = ({navigation, route}) => {
   const [submitting, setSubmitting] = useState(false);
   const [user, setUser] = useState(null);
   const [documents, setDocuments] = useState([]);
-  const [preview, setPreview] = useState(null); // { url, fileName } | null
+  const [previewDoc, setPreviewDoc] = useState(null); // { id, fileName }
 
   useEffect(() => {
     fetchData();
@@ -117,37 +115,29 @@ const VerifySubmitScreen = ({navigation, route}) => {
     }
   };
 
-  const openPreview = async doc => {
+  const openPreview = (doc) => {
     const documentId = doc.id || doc.documentId;
     const fileName = doc.fileName || doc.documentName || '';
-    const previewUrl = `${api.defaults.baseURL}/documents/preview/${documentId}`;
+    setPreviewDoc({ id: documentId, fileName });
+  };
 
-    console.log('PREVIEW URL =>', previewUrl);
-    console.log('DOCUMENT =>', doc);
-
-    if (isPdf(fileName)) {
-      Linking.openURL(previewUrl).catch(() =>
-        Toast.show({type: 'error', text1: 'Unable to load preview'}),
-      );
-      return;
-    }
-
-    // For images — verify URL is reachable before opening modal
+  const handleDocDownload = async (doc) => {
+    const id = doc.id || doc.documentId;
+    const fileName = doc.fileName || doc.documentName || `doc_${id}`;
     try {
-      const token = await AsyncStorage.getItem('token');
-      const res = await fetch(previewUrl, {
-        headers: token ? {Authorization: `Bearer ${token}`} : {},
-      });
-      if (!res.ok) {
-        Toast.show({type: 'error', text1: 'Unable to load preview'});
-        return;
+      Toast.show({ type: 'info', text1: 'Downloading...', visibilityTime: 1500 });
+      await downloadDocumentToStorage(id, fileName);
+      Toast.show({ type: 'success', text1: 'Download Complete', text2: 'Saved to Downloads folder' });
+    } catch (err) {
+      const msg = err?.message || '';
+      if (msg === 'UNAUTHORIZED') {
+        Toast.show({ type: 'error', text1: 'Unauthorized' });
+      } else if (msg === 'NOT_FOUND') {
+        Toast.show({ type: 'error', text1: 'File not found' });
+      } else {
+        Toast.show({ type: 'error', text1: 'Download failed' });
       }
-    } catch {
-      Toast.show({type: 'error', text1: 'Unable to load preview'});
-      return;
     }
-
-    setPreview({url: previewUrl, fileName});
   };
 
   const submitApplication = async () => {
@@ -227,11 +217,18 @@ const VerifySubmitScreen = ({navigation, route}) => {
         )}
       </View>
       {doc && (
-        <TouchableOpacity
-          style={styles.previewBtn}
-          onPress={() => openPreview(doc)}>
-          <Text style={styles.previewBtnText}>Preview</Text>
-        </TouchableOpacity>
+        <View style={styles.docCardActions}>
+          <TouchableOpacity
+            style={styles.previewBtn}
+            onPress={() => openPreview(doc)}>
+            <Text style={styles.previewBtnText}>👁</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.downloadSmBtn}
+            onPress={() => handleDocDownload(doc)}>
+            <Text style={styles.downloadSmBtnText}>⬇</Text>
+          </TouchableOpacity>
+        </View>
       )}
     </View>
   );
@@ -327,28 +324,13 @@ const VerifySubmitScreen = ({navigation, route}) => {
         )}
       </ScrollView>
 
-      {/* Image Preview Modal */}
-      <Modal
-        visible={!!preview}
-        animationType="slide"
-        onRequestClose={() => setPreview(null)}>
-        <View style={{flex: 1, backgroundColor: '#000'}}>
-          <TouchableOpacity
-            onPress={() => setPreview(null)}
-            style={{padding: 20}}>
-            <Text style={{color: '#fff', fontWeight: '700', fontSize: 16}}>
-              ✕ Close
-            </Text>
-          </TouchableOpacity>
-          {preview?.url && (
-            <Image
-              source={{uri: preview.url}}
-              resizeMode="contain"
-              style={{width: '100%', height: '90%'}}
-            />
-          )}
-        </View>
-      </Modal>
+      {/* Document Preview Modal */}
+      <DocumentPreviewModal
+        visible={!!previewDoc}
+        documentId={previewDoc?.id}
+        fileName={previewDoc?.fileName}
+        onClose={() => setPreviewDoc(null)}
+      />
     </SafeAreaView>
   );
 };
@@ -469,15 +451,31 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   previewBtn: {
-    backgroundColor: COLORS.primary + '14',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: RADIUS.sm,
+    backgroundColor: COLORS.accent + '18',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   previewBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: COLORS.primary,
+    fontSize: 16,
+  },
+  docCardActions: {
+    flexDirection: 'column',
+    gap: 6,
+    alignItems: 'center',
+  },
+  downloadSmBtn: {
+    backgroundColor: COLORS.primary + '14',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  downloadSmBtnText: {
+    fontSize: 16,
   },
 
   primaryBtn: {

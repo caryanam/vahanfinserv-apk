@@ -1,13 +1,15 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, ScrollView,
-  TouchableOpacity, ActivityIndicator, Image, Modal, Linking,
+  TouchableOpacity, ActivityIndicator,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import DocumentPicker from 'react-native-document-picker';
 import { launchCamera } from 'react-native-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../../services/api';
+import { downloadDocumentToStorage } from '../../services/documentService';
+import DocumentPreviewModal from '../../components/common/DocumentPreviewModal';
 import Toast from 'react-native-toast-message';
 import { sanitizeFileName } from '../../services/fileUtils';
 import { COLORS, SPACING, RADIUS } from '../../constants/theme';
@@ -130,7 +132,7 @@ const LoanStatusScreen = ({ navigation, route }) => {
   const [user, setUser] = useState(null);
   const [documents, setDocuments] = useState([]);
   const [reuploading, setReuploading] = useState({});
-  const [preview, setPreview] = useState(null);
+  const [previewDoc, setPreviewDoc] = useState(null); // { id, fileName }
   const [paymentStatus, setPaymentStatus] = useState(null);
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
@@ -260,30 +262,30 @@ const LoanStatusScreen = ({ navigation, route }) => {
     }
   };
 
-  // ── Preview ────────────────────────────────────────────────────────────────
-  const openPreview = async (doc) => {
+  // ── Preview & Download ────────────────────────────────────────────────────────
+  const openPreview = (doc) => {
     const docId = doc.id || doc.documentId;
     const fileName = doc.fileName || doc.documentName || '';
-    const previewUrl = `${api.defaults.baseURL}/documents/preview/${docId}`;
+    setPreviewDoc({ id: docId, fileName });
+  };
 
-    if (isPdf(fileName)) {
-      Linking.openURL(previewUrl).catch(() =>
-        Toast.show({ type: 'error', text1: 'Unable to open PDF' })
-      );
-      return;
-    }
-
+  const handleDocDownload = async (doc) => {
+    const id = doc.id || doc.documentId;
+    const fileName = doc.fileName || doc.documentName || `doc_${id}`;
     try {
-      const token = await AsyncStorage.getItem('token');
-      const res = await fetch(previewUrl, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      if (!res.ok) { Toast.show({ type: 'error', text1: 'Unable to load preview' }); return; }
-    } catch {
-      Toast.show({ type: 'error', text1: 'Unable to load preview' });
-      return;
+      Toast.show({ type: 'info', text1: 'Downloading...', visibilityTime: 1500 });
+      await downloadDocumentToStorage(id, fileName);
+      Toast.show({ type: 'success', text1: 'Download Complete', text2: 'Saved to Downloads folder' });
+    } catch (err) {
+      const msg = err?.message || '';
+      if (msg === 'UNAUTHORIZED') {
+        Toast.show({ type: 'error', text1: 'Unauthorized' });
+      } else if (msg === 'NOT_FOUND') {
+        Toast.show({ type: 'error', text1: 'File not found' });
+      } else {
+        Toast.show({ type: 'error', text1: 'Download failed' });
+      }
     }
-    setPreview({ url: previewUrl });
   };
 
   // ── Derive state ───────────────────────────────────────────────────────────
@@ -503,7 +505,10 @@ const LoanStatusScreen = ({ navigation, route }) => {
           </View>
           <View style={styles.docRowActions}>
             <TouchableOpacity style={styles.previewBtn} onPress={() => openPreview(doc)}>
-              <Text style={styles.previewBtnText}>Preview</Text>
+              <Text style={styles.previewBtnText}>👁</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.downloadSmBtn} onPress={() => handleDocDownload(doc)}>
+              <Text style={styles.downloadSmBtnText}>⬇</Text>
             </TouchableOpacity>
             {isRejected && (
               <View style={styles.reuploadActions}>
@@ -702,21 +707,13 @@ const LoanStatusScreen = ({ navigation, route }) => {
         )}
       </ScrollView>
 
-      {/* Image preview modal */}
-      <Modal visible={!!preview} animationType="slide" onRequestClose={() => setPreview(null)}>
-        <View style={{ flex: 1, backgroundColor: '#000' }}>
-          <TouchableOpacity onPress={() => setPreview(null)} style={{ padding: 20 }}>
-            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 16 }}>✕  Close</Text>
-          </TouchableOpacity>
-          {preview?.url && (
-            <Image
-              source={{ uri: preview.url }}
-              resizeMode="contain"
-              style={{ width: '100%', height: '90%' }}
-            />
-          )}
-        </View>
-      </Modal>
+      {/* Document Preview Modal */}
+      <DocumentPreviewModal
+        visible={!!previewDoc}
+        documentId={previewDoc?.id}
+        fileName={previewDoc?.fileName}
+        onClose={() => setPreviewDoc(null)}
+      />
     </SafeAreaView>
   );
 };
@@ -959,15 +956,26 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   previewBtn: {
-    backgroundColor: COLORS.primary + '14',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: RADIUS.sm,
+    backgroundColor: COLORS.accent + '18',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   previewBtnText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: COLORS.primary,
+    fontSize: 14,
+  },
+  downloadSmBtn: {
+    backgroundColor: COLORS.primary + '14',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  downloadSmBtnText: {
+    fontSize: 14,
   },
   reuploadBtn: {
     backgroundColor: COLORS.danger,

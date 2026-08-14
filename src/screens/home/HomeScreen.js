@@ -128,8 +128,8 @@ const HomeScreen = ({ navigation }) => {
   };
 
   const handlePhonePress = () => {
-    Linking.openURL('tel:+917755994123').catch(() => {
-      Alert.alert('Error', 'Unable to open dialer. Please dial +91 7755994123');
+    Linking.openURL('tel:+918483079733').catch(() => {
+      Alert.alert('Error', 'Unable to open dialer. Please dial +91 84830 79733');
     });
   };
 
@@ -523,7 +523,7 @@ const HomeScreen = ({ navigation }) => {
               </View>
               <View style={styles.contactTextContainer}>
                 <Text style={styles.contactLabel}>Call Us</Text>
-                <Text style={styles.contactValue}>+91 7755994123</Text>
+                <Text style={styles.contactValue}>+91 84830 79733</Text>
                 <Text style={styles.contactSubText}>
                   Mon-Sat, 9:00 AM - 6:00 PM
                 </Text>

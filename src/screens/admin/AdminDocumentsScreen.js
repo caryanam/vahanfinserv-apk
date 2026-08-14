@@ -3,10 +3,12 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, FlatList,
   TouchableOpacity, ActivityIndicator, RefreshControl, StatusBar,
-  Modal, Image, TextInput, Linking,
+  Modal, TextInput,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../../services/api';
+import { downloadDocumentToStorage } from '../../services/documentService';
+import DocumentPreviewModal from '../../components/common/DocumentPreviewModal';
 import { COLORS, SPACING, RADIUS } from '../../constants/theme';
 import Toast from 'react-native-toast-message';
 
@@ -37,15 +39,22 @@ const AdminDocumentsScreen = ({ navigation, route }) => {
   const filterUserId = route?.params?.userId;
   const filterUserName = route?.params?.userName;
 
+  const [userRole, setUserRole] = useState(null);
   const [activeTab, setActiveTab] = useState('Pending');
   const [docs, setDocs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState(null);
-  const [previewModal, setPreviewModal] = useState({ visible: false, url: null });
+  const [previewDoc, setPreviewDoc] = useState(null); // { id, fileName }
   const [rejectModal, setRejectModal] = useState({ visible: false, docId: null });
   const [remarkInputs, setRemarkInputs] = useState({});
   const [remarks, setRemarks] = useState('');
+
+  useEffect(() => {
+    AsyncStorage.getItem('role').then(role => setUserRole((role || '').toUpperCase()));
+  }, []);
+
+  const isAdmin = userRole === 'ADMIN';
 
   // ── Load ────────────────────────────────────────────────────────────────────
   const loadDocs = useCallback(async (tab = activeTab) => {
@@ -75,47 +84,45 @@ const AdminDocumentsScreen = ({ navigation, route }) => {
   }, [activeTab]);
 
   // ── Preview ─────────────────────────────────────────────────────────────────
-  const handlePreview = async (docId, fileName) => {
-    const previewUrl = `${api.defaults.baseURL}/documents/preview/${docId}`;
-    const isPdf = (fileName || '').toLowerCase().endsWith('.pdf');
+  const handlePreview = (docId, fileName) => {
+    setPreviewDoc({ id: docId, fileName });
+  };
 
-    if (isPdf) {
-      Linking.openURL(previewUrl).catch(() =>
-        Toast.show({ type: 'error', text1: 'Cannot open PDF' })
-      );
-      return;
-    }
-
+  // ── Download ────────────────────────────────────────────────────────────────
+  const handleDownload = async (docId, fileName) => {
     try {
-      const token = await AsyncStorage.getItem('token');
-      const res = await fetch(previewUrl, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      if (!res.ok) {
-        Toast.show({ type: 'error', text1: 'Unable to load preview' });
-        return;
+      Toast.show({ type: 'info', text1: 'Downloading...', visibilityTime: 1500 });
+      await downloadDocumentToStorage(docId, fileName || `doc_${docId}`);
+      Toast.show({ type: 'success', text1: 'Download Complete', text2: 'Saved to Downloads folder' });
+    } catch (err) {
+      const msg = err?.message || '';
+      if (msg === 'UNAUTHORIZED') {
+        Toast.show({ type: 'error', text1: 'Unauthorized' });
+      } else if (msg === 'NOT_FOUND') {
+        Toast.show({ type: 'error', text1: 'File not found' });
+      } else {
+        Toast.show({ type: 'error', text1: 'Download failed' });
       }
-    } catch {
-      Toast.show({ type: 'error', text1: 'Unable to load preview' });
-      return;
     }
-
-    setPreviewModal({ visible: true, url: previewUrl });
   };
 
   // ── Approve: VERIFY → APPROVE ───────────────────────────────────────────────
   const handleApprove = async (docId) => {
+    if (!isAdmin) {
+      Toast.show({ type: 'error', text1: 'Only Admin can approve documents' });
+      return;
+    }
     setActionLoading(`${docId}_approve`);
     try {
       // Step 1 — set VERIFIED (required by backend before APPROVED)
       try {
-        await api.put(`/documents/status/${docId}`, null, { params: { status: 'VERIFIED' } });
+        await api.put(`/documents/status/${docId}?status=VERIFIED`);
       } catch (e) {
         const msg = (e?.response?.data?.message || '').toLowerCase();
         if (!msg.includes('already') && !msg.includes('verified')) throw e;
       }
       // Step 2 — set APPROVED
-      await api.put(`/documents/status/${docId}`, null, { params: { status: 'APPROVED' } });
+      await api.put(`/documents/status/${docId}?status=APPROVED`);
       Toast.show({ type: 'success', text1: 'Document approved' });
       loadDocs(activeTab);
     } catch (e) {
@@ -127,11 +134,19 @@ const AdminDocumentsScreen = ({ navigation, route }) => {
 
   // ── Reject ──────────────────────────────────────────────────────────────────
   const openRejectModal = (docId) => {
+    if (!isAdmin) {
+      Toast.show({ type: 'error', text1: 'Only Admin can reject documents' });
+      return;
+    }
     setRemarks('');
     setRejectModal({ visible: true, docId });
   };
 
   const handleReject = async () => {
+    if (!isAdmin) {
+      Toast.show({ type: 'error', text1: 'Only Admin can reject documents' });
+      return;
+    }
     if (!remarks.trim()) {
       Toast.show({ type: 'error', text1: 'Remarks are required to reject' });
       return;
@@ -141,7 +156,7 @@ const AdminDocumentsScreen = ({ navigation, route }) => {
     setActionLoading(`${docId}_reject`);
     try {
       await api.put(`/documents/${docId}/remarks`, { remarks: remarks.trim() });
-      await api.put(`/documents/status/${docId}`, null, { params: { status: 'REJECTED' } });
+      await api.put(`/documents/status/${docId}?status=REJECTED`);
       Toast.show({ type: 'success', text1: 'Document rejected' });
       loadDocs(activeTab);
     } catch (e) {
@@ -153,6 +168,10 @@ const AdminDocumentsScreen = ({ navigation, route }) => {
 
   // ── Save inline remark ──────────────────────────────────────────────────────
   const handleSaveRemark = async (docId) => {
+    if (!isAdmin) {
+      Toast.show({ type: 'error', text1: 'Only Admin can save remarks' });
+      return;
+    }
     const remark = remarkInputs[docId]?.trim();
     if (!remark) { Toast.show({ type: 'error', text1: 'Enter a remark first' }); return; }
     setActionLoading(`${docId}_remark`);
@@ -174,8 +193,12 @@ const AdminDocumentsScreen = ({ navigation, route }) => {
     const status = (item.status || 'PENDING').toUpperCase();
     const color = STATUS_COLOR[status] || '#F59E0B';
     const isActing = actionLoading?.startsWith(String(id));
-    const isActionable = ACTIONABLE_STATUSES.includes(status);
+    const isActionable = isAdmin && ACTIONABLE_STATUSES.includes(status);
     const fileName = item.fileName || item.originalFileName || '';
+    const uploadDate = item.uploadDate || item.createdAt || item.uploadedAt;
+    const formattedDate = uploadDate
+      ? new Date(uploadDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+      : null;
 
     return (
       <View style={styles.card}>
@@ -191,6 +214,9 @@ const AdminDocumentsScreen = ({ navigation, route }) => {
             </Text>
             <Text style={styles.docType}>{item.documentType || item.type || '—'}</Text>
             <Text style={styles.fileName} numberOfLines={1}>{fileName || '—'}</Text>
+            {formattedDate && (
+              <Text style={styles.uploadDate}>📅 {formattedDate}</Text>
+            )}
           </View>
           <View style={[styles.badge, { backgroundColor: `${color}18` }]}>
             <Text style={[styles.badgeText, { color }]}>{status}</Text>
@@ -234,6 +260,15 @@ const AdminDocumentsScreen = ({ navigation, route }) => {
               ? <ActivityIndicator size="small" color={COLORS.accent} />
               : <Text style={styles.btnPreviewText}>👁 Preview</Text>
             }
+          </TouchableOpacity>
+
+          {/* Download — always visible */}
+          <TouchableOpacity
+            style={[styles.btn, styles.btnDownload]}
+            disabled={!!isActing}
+            onPress={() => handleDownload(id, fileName)}
+          >
+            <Text style={styles.btnDownloadText}>⬇ Download</Text>
           </TouchableOpacity>
 
           {/* Approve & Reject — only for PENDING / PAYMENT_VERIFICATION_PENDING */}
@@ -334,28 +369,13 @@ const AdminDocumentsScreen = ({ navigation, route }) => {
         />
       )}
 
-      {/* Image Preview Modal */}
-      <Modal
-        visible={previewModal.visible}
-        animationType="slide"
-        onRequestClose={() => setPreviewModal({ visible: false, url: null })}
-      >
-        <View style={{ flex: 1, backgroundColor: '#000' }}>
-          <TouchableOpacity
-            onPress={() => setPreviewModal({ visible: false, url: null })}
-            style={{ padding: 20 }}
-          >
-            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 16 }}>✕  Close</Text>
-          </TouchableOpacity>
-          {previewModal.url && (
-            <Image
-              source={{ uri: previewModal.url }}
-              style={{ width: '100%', height: '90%' }}
-              resizeMode="contain"
-            />
-          )}
-        </View>
-      </Modal>
+      {/* Document Preview Modal */}
+      <DocumentPreviewModal
+        visible={!!previewDoc}
+        documentId={previewDoc?.id}
+        fileName={previewDoc?.fileName}
+        onClose={() => setPreviewDoc(null)}
+      />
 
       {/* Reject Remarks Modal */}
       <Modal visible={rejectModal.visible} transparent animationType="slide">
@@ -438,6 +458,7 @@ const styles = StyleSheet.create({
   cardSub: { fontSize: 12, color: COLORS.textSecondary, marginTop: 1 },
   docType: { fontSize: 13, fontWeight: '600', color: COLORS.primary, marginTop: 3 },
   fileName: { fontSize: 11, color: COLORS.textMuted, marginTop: 2 },
+  uploadDate: { fontSize: 11, color: COLORS.textMuted, marginTop: 2 },
   badge: { paddingHorizontal: SPACING.sm, paddingVertical: 3, borderRadius: RADIUS.sm, flexShrink: 0 },
   badgeText: { fontSize: 11, fontWeight: '700' },
   existingRemark: { fontSize: 12, color: '#F59E0B', marginTop: SPACING.sm, fontStyle: 'italic' },
@@ -453,13 +474,15 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: COLORS.accent,
   },
   remarkSaveBtnText: { color: COLORS.accent, fontSize: 12, fontWeight: '700' },
-  actions: { flexDirection: 'row', gap: SPACING.sm, marginTop: SPACING.sm },
+  actions: { flexDirection: 'row', gap: SPACING.sm, marginTop: SPACING.sm, flexWrap: 'wrap' },
   btn: {
     flex: 1, paddingVertical: 8, borderRadius: RADIUS.sm,
-    alignItems: 'center', justifyContent: 'center',
+    alignItems: 'center', justifyContent: 'center', minWidth: 80,
   },
   btnPreview: { backgroundColor: `${COLORS.accent}18`, borderWidth: 1, borderColor: COLORS.accent },
   btnPreviewText: { color: COLORS.accent, fontSize: 12, fontWeight: '700' },
+  btnDownload: { backgroundColor: `${COLORS.primary}12`, borderWidth: 1, borderColor: COLORS.primary },
+  btnDownloadText: { color: COLORS.primary, fontSize: 12, fontWeight: '700' },
   btnApprove: { backgroundColor: '#10B981' },
   btnReject: { backgroundColor: '#EF4444' },
   btnWhiteText: { color: COLORS.white, fontSize: 12, fontWeight: '700' },

@@ -876,7 +876,7 @@
 
 // export default CustomerDashboardScreen;
 // src/screens/customer/CustomerDashboardScreen.js
-import React, {useCallback, useEffect, useState} from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -891,8 +891,8 @@ import {
   Alert,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {getUserDocuments} from '../../services/documentService';
-import {getUserProfile} from '../../services/customerService';
+import { getUserDocuments, downloadDocumentToStorage } from '../../services/documentService';
+import { getUserProfile } from '../../services/customerService';
 import {
   READY2DRIVE_TOTAL_AMOUNT,
   READY2DRIVE_FEE_LABEL,
@@ -903,15 +903,16 @@ import {
 } from '../../constants/payment';
 import Sidebar from '../../components/common/Sidebar';
 import StatCard from '../../components/common/StatCard';
-import {COLORS, SPACING, RADIUS} from '../../constants/theme';
+import DocumentPreviewModal from '../../components/common/DocumentPreviewModal';
+import { COLORS, SPACING, RADIUS } from '../../constants/theme';
 import Toast from 'react-native-toast-message';
 
 const CUSTOMER_MENU = [
-  {name: 'Dashboard', emoji: '🏠'},
-  {name: 'Documents', emoji: '📄'},
-  {name: 'Status', emoji: '📋'},
-  {name: 'Settings', emoji: '⚙️'},
-  {name: 'Legal', emoji: '⚖️'},
+  { name: 'Dashboard', emoji: '🏠' },
+  { name: 'Documents', emoji: '📄' },
+  { name: 'Status', emoji: '📋' },
+  { name: 'Settings', emoji: '⚙️' },
+  { name: 'Legal', emoji: '⚖️' },
 ];
 
 const DOCUMENT_LABELS = {
@@ -940,25 +941,25 @@ const DOCUMENT_LABELS = {
 };
 
 const STATUS_COLORS = {
-  PENDING: {bg: '#FEF3C7', text: '#92400E'},
-  APPROVED: {bg: '#D1FAE5', text: '#065F46'},
-  VERIFIED: {bg: '#DBEAFE', text: '#1E40AF'},
-  REJECTED: {bg: '#FEE2E2', text: '#991B1B'},
+  PENDING: { bg: '#FEF3C7', text: '#92400E' },
+  APPROVED: { bg: '#D1FAE5', text: '#065F46' },
+  VERIFIED: { bg: '#DBEAFE', text: '#1E40AF' },
+  REJECTED: { bg: '#FEE2E2', text: '#991B1B' },
 };
 
-const StatusBadge = ({status}) => {
-  const colors = STATUS_COLORS[status] || {bg: '#F3F4F6', text: '#374151'};
+const StatusBadge = ({ status }) => {
+  const colors = STATUS_COLORS[status] || { bg: '#F3F4F6', text: '#374151' };
 
   return (
-    <View style={[styles.badge, {backgroundColor: colors.bg}]}>
-      <Text style={[styles.badgeText, {color: colors.text}]}>
+    <View style={[styles.badge, { backgroundColor: colors.bg }]}>
+      <Text style={[styles.badgeText, { color: colors.text }]}>
         {status || 'PENDING'}
       </Text>
     </View>
   );
 };
 
-const CustomerDashboardScreen = ({navigation}) => {
+const CustomerDashboardScreen = ({ navigation }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeMenu, setActiveMenu] = useState('Dashboard');
   const [loading, setLoading] = useState(true);
@@ -972,6 +973,32 @@ const CustomerDashboardScreen = ({navigation}) => {
     approved: 0,
     rejected: 0,
   });
+  const [previewDoc, setPreviewDoc] = useState(null); // { id, fileName }
+
+  const handleDocPreview = (doc) => {
+    const id = doc.documentId || doc.id;
+    const fileName = doc.fileName || doc.originalFileName || '';
+    setPreviewDoc({ id, fileName });
+  };
+
+  const handleDocDownload = async (doc) => {
+    const id = doc.documentId || doc.id;
+    const fileName = doc.fileName || doc.originalFileName || `doc_${id}`;
+    try {
+      Toast.show({ type: 'info', text1: 'Downloading...', visibilityTime: 1500 });
+      await downloadDocumentToStorage(id, fileName);
+      Toast.show({ type: 'success', text1: 'Download Complete', text2: 'Saved to Downloads folder' });
+    } catch (err) {
+      const msg = err?.message || '';
+      if (msg === 'UNAUTHORIZED') {
+        Toast.show({ type: 'error', text1: 'Unauthorized' });
+      } else if (msg === 'NOT_FOUND') {
+        Toast.show({ type: 'error', text1: 'File not found' });
+      } else {
+        Toast.show({ type: 'error', text1: 'Download failed' });
+      }
+    }
+  };
 
   const regType = String(
     profile?.registrationType || userData?.registrationType || '',
@@ -999,7 +1026,7 @@ const CustomerDashboardScreen = ({navigation}) => {
     try {
       const [profileRes, docsRes] = await Promise.allSettled([
         getUserProfile(userId).catch(() => null),
-        getUserDocuments(userId).catch(() => ({data: {data: []}})),
+        getUserDocuments(userId).catch(() => ({ data: { data: [] } })),
       ]);
 
       if (profileRes.status === 'fulfilled' && profileRes.value) {
@@ -1027,7 +1054,7 @@ const CustomerDashboardScreen = ({navigation}) => {
         rejected: docs.filter(d => d.status === 'REJECTED').length,
       });
     } catch (err) {
-      Toast.show({type: 'error', text1: 'Failed to load data'});
+      Toast.show({ type: 'error', text1: 'Failed to load data' });
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -1081,9 +1108,13 @@ const CustomerDashboardScreen = ({navigation}) => {
     navigation.replace('Login');
   };
 
-  const renderDocumentItem = ({item}) => {
+  const renderDocumentItem = ({ item }) => {
     const label =
       DOCUMENT_LABELS[item.documentType] || item.documentType || item.type;
+    const uploadDate = item.uploadDate || item.createdAt || item.uploadedAt;
+    const formattedDate = uploadDate
+      ? new Date(uploadDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+      : null;
 
     return (
       <View style={styles.docCard}>
@@ -1097,6 +1128,9 @@ const CustomerDashboardScreen = ({navigation}) => {
             <Text style={styles.docFileName} numberOfLines={1}>
               {item.fileName || item.originalFileName || 'Document'}
             </Text>
+            {formattedDate && (
+              <Text style={styles.docDate}>📅 {formattedDate}</Text>
+            )}
           </View>
 
           <StatusBadge status={item.status} />
@@ -1105,6 +1139,22 @@ const CustomerDashboardScreen = ({navigation}) => {
         {item.remarks && (
           <Text style={styles.docRemarks}>💬 {item.remarks}</Text>
         )}
+
+        {/* Preview / Download buttons */}
+        <View style={styles.docActions}>
+          <TouchableOpacity
+            style={styles.docPreviewBtn}
+            onPress={() => handleDocPreview(item)}
+          >
+            <Text style={styles.docPreviewBtnText}>👁 Preview</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.docDownloadBtn}
+            onPress={() => handleDocDownload(item)}
+          >
+            <Text style={styles.docDownloadBtnText}>⬇ Download</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   };
@@ -1384,13 +1434,21 @@ const CustomerDashboardScreen = ({navigation}) => {
       </View>
 
       <View style={styles.content}>{renderContent()}</View>
+
+      {/* Document Preview Modal */}
+      <DocumentPreviewModal
+        visible={!!previewDoc}
+        documentId={previewDoc?.id}
+        fileName={previewDoc?.fileName}
+        onClose={() => setPreviewDoc(null)}
+      />
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  safeArea: {flex: 1, backgroundColor: COLORS.primary},
-  flex: {flex: 1},
+  safeArea: { flex: 1, backgroundColor: COLORS.primary },
+  flex: { flex: 1 },
 
   topBar: {
     flexDirection: 'row',
@@ -1401,9 +1459,9 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     gap: SPACING.md,
   },
-  menuBtn: {padding: SPACING.xs},
-  menuBtnText: {color: COLORS.white, fontSize: 22},
-  pageTitle: {flex: 1, color: COLORS.white, fontSize: 18, fontWeight: '700'},
+  menuBtn: { padding: SPACING.xs },
+  menuBtnText: { color: COLORS.white, fontSize: 22 },
+  pageTitle: { flex: 1, color: COLORS.white, fontSize: 18, fontWeight: '700' },
   avatarCircle: {
     width: 36,
     height: 36,
@@ -1412,7 +1470,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarText: {color: COLORS.primary, fontWeight: '800', fontSize: 14},
+  avatarText: { color: COLORS.primary, fontWeight: '800', fontSize: 14 },
 
   content: {
     flex: 1,
@@ -1440,8 +1498,8 @@ const styles = StyleSheet.create({
     padding: SPACING.lg,
     marginBottom: SPACING.md,
   },
-  welcomeText: {color: COLORS.white, fontSize: 18, fontWeight: '700'},
-  welcomeSub: {color: '#8fa3c7', fontSize: 13, marginTop: 4},
+  welcomeText: { color: COLORS.white, fontSize: 18, fontWeight: '700' },
+  welcomeSub: { color: '#8fa3c7', fontSize: 13, marginTop: 4 },
 
   applyLoanBtn: {
     backgroundColor: COLORS.accent || '#20C7B5',
@@ -1514,16 +1572,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: SPACING.xs,
   },
-  paymentLabel: {fontSize: 13, color: COLORS.textSecondary},
-  paymentValue: {fontSize: 13, fontWeight: '600', color: COLORS.text},
+  paymentLabel: { fontSize: 13, color: COLORS.textSecondary },
+  paymentValue: { fontSize: 13, fontWeight: '600', color: COLORS.text },
   paymentTotal: {
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
     paddingTop: SPACING.xs,
     marginTop: SPACING.xs,
   },
-  paymentTotalLabel: {fontSize: 14, fontWeight: '700', color: COLORS.text},
-  paymentTotalValue: {fontSize: 16, fontWeight: '800', color: COLORS.accent},
+  paymentTotalLabel: { fontSize: 14, fontWeight: '700', color: COLORS.text },
+  paymentTotalValue: { fontSize: 16, fontWeight: '800', color: COLORS.accent },
 
   docCard: {
     backgroundColor: COLORS.white,
@@ -1532,7 +1590,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
     elevation: 1,
   },
-  docCardRow: {flexDirection: 'row', alignItems: 'center', gap: SPACING.md},
+  docCardRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md },
   docIconCircle: {
     width: 40,
     height: 40,
@@ -1541,14 +1599,54 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  docIcon: {fontSize: 20},
-  docInfo: {flex: 1},
-  docType: {fontSize: 14, fontWeight: '600', color: COLORS.text},
-  docFileName: {fontSize: 12, color: COLORS.textSecondary, marginTop: 2},
+  docIcon: { fontSize: 20 },
+  docInfo: { flex: 1 },
+  docType: { fontSize: 14, fontWeight: '600', color: COLORS.text },
+  docFileName: { fontSize: 12, color: COLORS.textSecondary, marginTop: 2 },
+  docDate: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+    marginTop: 2,
+  },
   docRemarks: {
     fontSize: 12,
     color: COLORS.textSecondary,
     marginTop: SPACING.xs,
+  },
+  docActions: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    marginTop: SPACING.sm,
+  },
+  docPreviewBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: RADIUS.sm,
+    backgroundColor: `${COLORS.accent}18`,
+    borderWidth: 1,
+    borderColor: COLORS.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  docPreviewBtnText: {
+    color: COLORS.accent,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  docDownloadBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: RADIUS.sm,
+    backgroundColor: `${COLORS.primary}12`,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  docDownloadBtnText: {
+    color: COLORS.primary,
+    fontSize: 12,
+    fontWeight: '700',
   },
 
   badge: {
@@ -1556,8 +1654,8 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: RADIUS.sm,
   },
-  badgeText: {fontSize: 11, fontWeight: '700'},
-  emptyText: {color: COLORS.textSecondary, fontSize: 14},
+  badgeText: { fontSize: 11, fontWeight: '700' },
+  emptyText: { color: COLORS.textSecondary, fontSize: 14 },
 
   settingsCard: {
     backgroundColor: COLORS.white,
@@ -1590,7 +1688,7 @@ const styles = StyleSheet.create({
     elevation: 2,
     shadowColor: '#000',
     shadowOpacity: 0.05,
-    shadowOffset: {width: 0, height: 1},
+    shadowOffset: { width: 0, height: 1 },
     shadowRadius: 3,
   },
   legalMenuIconBox: {

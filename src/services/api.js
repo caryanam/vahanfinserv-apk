@@ -3,8 +3,8 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const api = axios.create({
-baseURL: 'https://v1.vahanfinserv.com/api', // Android emulator → localhost
- // baseURL: 'http://10.10.1.205:8082/api',
+  baseURL: 'https://v1.vahanfinserv.com/api', // Android emulator → localhost
+  // baseURL: 'http://10.10.1.205:8082/api',
   timeout: 15000,
 });
 
@@ -30,13 +30,21 @@ api.interceptors.request.use(async (config) => {
   return config;
 });
 
-// Handle 403 Forbidden - Session Expired
+// Handle 401 Unauthorized / Token Expired - Session Expired
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    if (error?.response?.status === 403) {
+    const status = error?.response?.status;
+    const msg = (error?.response?.data?.message || error?.response?.data?.error || '').toLowerCase();
+
+    // Auto-logout ONLY on 401 Unauthorized or explicit token expiration messages
+    if (
+      status === 401 ||
+      (status === 403 &&
+        (msg.includes('jwt') || msg.includes('token expired') || msg.includes('session expired')))
+    ) {
       await AsyncStorage.multiRemove(['token', 'role', 'user', 'userData', 'dealerData', 'adminData']);
-      console.log('[API] Session expired - 403 Forbidden');
+      console.log('[API] Session expired - Logging out');
       if (navigationCallback) {
         navigationCallback();
       }

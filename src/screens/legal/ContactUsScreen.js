@@ -1,4 +1,4 @@
-import React, {useEffect, useRef} from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,9 +10,9 @@ import {
   Linking,
   Alert,
 } from 'react-native';
-import {COLORS, SPACING, RADIUS} from '../../constants/theme';
+import { COLORS, SPACING, RADIUS } from '../../constants/theme';
 
-const ContactUsScreen = ({navigation}) => {
+const ContactUsScreen = ({ navigation }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
 
@@ -40,8 +40,8 @@ const ContactUsScreen = ({navigation}) => {
   };
 
   const handlePhonePress = () => {
-    Linking.openURL('tel:+917755994123').catch(() => {
-      Alert.alert('Error', 'Unable to open dialer. Please dial +91 7755994123');
+    Linking.openURL('tel:+918483079733').catch(() => {
+      Alert.alert('Error', 'Unable to open dialer. Please dial +91 84830 79733');
     });
   };
 
@@ -82,7 +82,7 @@ const ContactUsScreen = ({navigation}) => {
       <Animated.ScrollView
         style={[
           styles.scrollView,
-          {opacity: fadeAnim, transform: [{translateY: slideAnim}]},
+          { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
         ]}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
@@ -125,13 +125,13 @@ const ContactUsScreen = ({navigation}) => {
           <View
             style={[
               styles.contactIconCircle,
-              {backgroundColor: COLORS.success + '15'},
+              { backgroundColor: COLORS.success + '15' },
             ]}>
             <Text style={styles.contactIcon}>📞</Text>
           </View>
           <View style={styles.contactInfo}>
             <Text style={styles.contactLabel}>Call Support</Text>
-            <Text style={styles.contactValue}>+91 7755994123</Text>
+            <Text style={styles.contactValue}>+91 84830 79733</Text>
             <Text style={styles.contactHint}>Tap to make a phone call</Text>
           </View>
           <Text style={styles.arrowText}>→</Text>
@@ -145,7 +145,7 @@ const ContactUsScreen = ({navigation}) => {
           <View
             style={[
               styles.contactIconCircle,
-              {backgroundColor: COLORS.info + '15'},
+              { backgroundColor: COLORS.info + '15' },
             ]}>
             <Text style={styles.contactIcon}>📍</Text>
           </View>
@@ -227,7 +227,7 @@ const styles = StyleSheet.create({
     elevation: 3,
     shadowColor: '#000',
     shadowOpacity: 0.08,
-    shadowOffset: {width: 0, height: 2},
+    shadowOffset: { width: 0, height: 2 },
     shadowRadius: 8,
   },
   iconCircle: {
@@ -273,7 +273,7 @@ const styles = StyleSheet.create({
     elevation: 2,
     shadowColor: '#000',
     shadowOpacity: 0.05,
-    shadowOffset: {width: 0, height: 1},
+    shadowOffset: { width: 0, height: 1 },
     shadowRadius: 4,
   },
   contactIconCircle: {
