@@ -76,14 +76,25 @@ android {
 
     namespace "tempfinservapp.com"
     defaultConfig {
-    applicationId "tempfinservapp.com"
-    minSdkVersion rootProject.ext.minSdkVersion
-    targetSdkVersion rootProject.ext.targetSdkVersion
-    versionCode 8
-    versionName "1.0.4"
+        applicationId "tempfinservapp.com"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode 18
+        versionName "1.1.4"
+        
 
-    resConfigs "en", "hi", "mr"
-}
+        resConfigs "en", "hi", "mr"
+
+        externalNativeBuild {
+            cmake {
+                arguments "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
+                cppFlags "-Wl,-z,max-page-size=16384"
+            }
+            ndkBuild {
+                arguments "APP_LDFLAGS+=-Wl,-z,max-page-size=16384"
+            }
+        }
+    }
     
 
     signingConfigs {
@@ -107,10 +118,16 @@ android {
         }
         
         release {
-    signingConfig signingConfigs.release
-    minifyEnabled enableProguardInReleaseBuilds
-    proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
-}
+            signingConfig signingConfigs.release
+            minifyEnabled enableProguardInReleaseBuilds
+            proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
+        }
+    }
+
+    packagingOptions {
+        jniLibs {
+            useLegacyPackaging = true
+        }
     }
 }
 
@@ -127,3 +144,113 @@ dependencies {
 }
 
 apply from: file("../../node_modules/@react-native-community/cli-platform-android/native_modules.gradle"); applyNativeModulesAppBuildGradle(project)
+
+import java.io.RandomAccessFile
+
+def readLongLE(RandomAccessFile raf) {
+    byte[] b = new byte[8]
+    raf.readFully(b)
+    long val = 0
+    for (int i = 7; i >= 0; i--) val = (val << 8) | (b[i] & 0xFF)
+    return val
+}
+
+def readIntLE(RandomAccessFile raf) {
+    byte[] b = new byte[4]
+    raf.readFully(b)
+    return (b[0] & 0xFF) | ((b[1] & 0xFF) << 8) | ((b[2] & 0xFF) << 16) | ((b[3] & 0xFF) << 24)
+}
+
+def readShortLE(RandomAccessFile raf) {
+    byte[] b = new byte[2]
+    raf.readFully(b)
+    return (b[0] & 0xFF) | ((b[1] & 0xFF) << 8)
+}
+
+def writeLongLE(RandomAccessFile raf, long val) {
+    byte[] b = new byte[8]
+    for (int i = 0; i < 8; i++) { b[i] = (byte)(val & 0xFF); val >>= 8; }
+    raf.write(b)
+}
+
+def writeIntLE(RandomAccessFile raf, int val) {
+    byte[] b = new byte[4]
+    b[0] = (byte)(val & 0xFF)
+    b[1] = (byte)((val >> 8) & 0xFF)
+    b[2] = (byte)((val >> 16) & 0xFF)
+    b[3] = (byte)((val >> 24) & 0xFF)
+    raf.write(b)
+}
+
+def fix16KbElfAlignment(File file) {
+    if (!file.exists() || !file.name.endsWith(".so")) return
+    try {
+        RandomAccessFile raf = new RandomAccessFile(file, "rw")
+        try {
+            if (raf.length() < 128) return
+            byte[] header = new byte[128]
+            raf.readFully(header)
+            if (header[0] != 0x7f || header[1] != (byte)'E' || header[2] != (byte)'L' || header[3] != (byte)'F') return
+            
+            boolean is64Bit = (header[4] == 2)
+            boolean isLittleEndian = (header[5] == 1)
+            if (!isLittleEndian) return
+
+            if (is64Bit) {
+                raf.seek(0x20)
+                long e_phoff = readLongLE(raf)
+                raf.seek(0x36)
+                int e_phentsize = readShortLE(raf)
+                int e_phnum = readShortLE(raf)
+
+                for (int i = 0; i < e_phnum; i++) {
+                    long entryOffset = e_phoff + (i * e_phentsize)
+                    raf.seek(entryOffset)
+                    int p_type = readIntLE(raf)
+                    if (p_type == 1) { // PT_LOAD
+                        long alignOffset = entryOffset + 48
+                        raf.seek(alignOffset)
+                        long p_align = readLongLE(raf)
+                        if (p_align < 16384) {
+                            raf.seek(alignOffset)
+                            writeLongLE(raf, 16384L)
+                        }
+                    }
+                }
+            } else {
+                raf.seek(0x1C)
+                long e_phoff = readIntLE(raf) & 0xFFFFFFFFL
+                raf.seek(0x2A)
+                int e_phentsize = readShortLE(raf)
+                int e_phnum = readShortLE(raf)
+
+                for (int i = 0; i < e_phnum; i++) {
+                    long entryOffset = e_phoff + (i * e_phentsize)
+                    raf.seek(entryOffset)
+                    int p_type = readIntLE(raf)
+                    if (p_type == 1) { // PT_LOAD
+                        long alignOffset = entryOffset + 28
+                        raf.seek(alignOffset)
+                        long p_align = readIntLE(raf) & 0xFFFFFFFFL
+                        if (p_align < 16384) {
+                            raf.seek(alignOffset)
+                            writeIntLE(raf, 16384)
+                        }
+                    }
+                }
+            }
+        } finally {
+            raf.close()
+        }
+    } catch (Exception e) {
+        // ignore
+    }
+}
+
+tasks.matching { it.name.contains("NativeLibs") || it.name.contains("DebugSymbols") || it.name.contains("package") }.configureEach { task ->
+    task.doLast {
+        fileTree(dir: "${buildDir}/intermediates").matching { include "**/*.so" }.each { file ->
+            fix16KbElfAlignment(file)
+        }
+    }
+}

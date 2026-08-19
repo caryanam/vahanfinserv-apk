@@ -43,3 +43,31 @@ buildscript {
 }
 
 apply plugin: "com.facebook.react.rootproject"
+
+subprojects { subproject ->
+    def configureSubproject = {
+        if (subproject.hasProperty("android")) {
+            subproject.android {
+                defaultConfig {
+                    externalNativeBuild {
+                        cmake {
+                            arguments "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
+                            cppFlags "-Wl,-z,max-page-size=16384"
+                        }
+                        ndkBuild {
+                            arguments "APP_LDFLAGS+=-Wl,-z,max-page-size=16384"
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (subproject.state.executed) {
+        configureSubproject()
+    } else {
+        subproject.afterEvaluate {
+            configureSubproject()
+        }
+    }
+}
