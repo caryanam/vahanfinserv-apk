@@ -61,3 +61,18 @@ export const userResetPassword = async (dto) => {
   const response = await api.post('/user/reset-password', dto, { skipAuth: true });
   return response.data;
 };
+
+export const userSendMobileOtp = async (mobile) => {
+  const response = await api.post(
+    `/user/register/send-mobile-otp?mobileNumber=${encodeURIComponent(mobile)}`,
+    null,
+    { skipAuth: true },
+  );
+  return response.data;
+};
+
+export const userRegisterVerifyMobileOtp = async (dto) => {
+  // dto: { mobile, otp }
+  const response = await api.post('/user/register/verify-mobile-otp', dto, { skipAuth: true });
+  return response.data;
+};

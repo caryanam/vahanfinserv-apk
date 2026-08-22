@@ -1,29 +1,37 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  View, Text, StyleSheet, SafeAreaView, ScrollView,
-  TouchableOpacity, ActivityIndicator, RefreshControl, StatusBar,
+  View,
+  Text,
+  StyleSheet,
+  SafeAreaView,
+  ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
+  RefreshControl,
+  StatusBar,
+  Platform,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import api from '../../services/api';
 import Sidebar from '../../components/common/Sidebar';
-import StatCard from '../../components/common/StatCard';
+import AdminIcon from '../../components/common/AdminIcon';
 import { COLORS, SPACING, RADIUS } from '../../constants/theme';
 import Toast from 'react-native-toast-message';
 
-const PAYMENT_REQUESTS_KEY  = 'customer_payment_requests';
-const DEALER_USERS_KEY      = 'dealer_registered_users';
-const PAY_PENDING           = 'PAYMENT_VERIFICATION_PENDING';
+const PAYMENT_REQUESTS_KEY = 'customer_payment_requests';
+const DEALER_USERS_KEY = 'dealer_registered_users';
+const PAY_PENDING = 'PAYMENT_VERIFICATION_PENDING';
 
 const ADMIN_MENU = [
-  { name: 'Dashboard', emoji: '📊' },
-  { name: 'Users', emoji: '👥' },
-  { name: 'Dealers', emoji: '🤝' },
-  { name: 'Documents', emoji: '📋' },
-  { name: 'Payments', emoji: '💳' },
-  { name: 'Banks', emoji: '🏦' },
-  { name: 'Reports', emoji: '📈' },
-  { name: 'Settings', emoji: '⚙️' },
+  { name: 'Dashboard' },
+  { name: 'Users' },
+  { name: 'Dealers' },
+  { name: 'Documents' },
+  { name: 'Payments' },
+  { name: 'Banks' },
+  { name: 'Reports' },
+  { name: 'Settings' },
 ];
 
 const NAV_MAP = {
@@ -36,13 +44,13 @@ const NAV_MAP = {
   Settings: 'AdminSettings',
 };
 
-const QUICK_LINKS = [
-  { label: 'Users', emoji: '👥', screen: 'AdminUsers', color: COLORS.accent },
-  { label: 'Dealers', emoji: '🤝', screen: 'AdminDealers', color: '#F59E0B' },
-  { label: 'Documents', emoji: '📋', screen: 'AdminDocuments', color: '#EF4444' },
-  { label: 'Payments', emoji: '💳', screen: 'AdminPayments', color: '#0EA5E9' },
-  { label: 'Banks', emoji: '🏦', screen: 'AdminBanks', color: '#8B5CF6' },
-  { label: 'Reports', emoji: '📈', screen: 'AdminReports', color: '#10B981' },
+const QUICK_ACCESS_TILES = [
+  { label: 'Users', name: 'Users', screen: 'AdminUsers', bg: '#EEF2FF', iconColor: '#3B82F6' },
+  { label: 'Dealers', name: 'Dealers', screen: 'AdminDealers', bg: '#FFF7ED', iconColor: '#F59E0B' },
+  { label: 'Documents', name: 'Documents', screen: 'AdminDocuments', bg: '#ECFDF5', iconColor: '#10B981' },
+  { label: 'Payments', name: 'Payments', screen: 'AdminPayments', bg: '#F3E8FF', iconColor: '#8B5CF6' },
+  { label: 'Banks', name: 'Banks', screen: 'AdminBanks', bg: '#E0F2FE', iconColor: '#0EA5E9' },
+  { label: 'Reports', name: 'Reports', screen: 'AdminReports', bg: '#FEF2F2', iconColor: '#EF4444' },
 ];
 
 const safe = (result) => {
@@ -57,9 +65,14 @@ const AdminDashboardScreen = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [adminData, setAdminData] = useState(null);
   const [stats, setStats] = useState({
-    users: 0, dealers: 0, pendingDocs: 0,
-    verifiedDocs: 0, applications: 0, banks: 0,
-    notifications: 0, payments: 0,
+    users: 0,
+    dealers: 0,
+    pendingDocs: 0,
+    verifiedDocs: 0,
+    applications: 0,
+    banks: 0,
+    notifications: 0,
+    payments: 0,
   });
 
   useEffect(() => {
@@ -69,7 +82,6 @@ const AdminDashboardScreen = ({ navigation }) => {
         if (raw) setAdminData(JSON.parse(raw));
       } catch {}
     })();
-    // loadData is called by useFocusEffect below
   }, []);
 
   const loadData = useCallback(async () => {
@@ -80,7 +92,6 @@ const AdminDashboardScreen = ({ navigation }) => {
         if (raw) adminId = JSON.parse(raw)?.id ?? JSON.parse(raw)?.userId;
       } catch {}
 
-      // Load API data and AsyncStorage payment count + dealer users in parallel
       const [results, payRaw, dealerUsersRaw] = await Promise.all([
         Promise.allSettled([
           api.get('/user/all'),
@@ -95,42 +106,34 @@ const AdminDashboardScreen = ({ navigation }) => {
         AsyncStorage.getItem(DEALER_USERS_KEY).catch(() => null),
       ]);
 
-      const users        = safe(results[0]);
-      const dealers      = safe(results[1]);
-      const pending      = safe(results[2]);
-      const verified     = safe(results[3]);
+      const users = safe(results[0]);
+      const dealers = safe(results[1]);
+      const pending = safe(results[2]);
+      const verified = safe(results[3]);
       const applications = safe(results[4]);
-      const banks        = safe(results[5]);
-      const notifs       = safe(results[6]);
-      const unread       = notifs.filter(n => !n.read && !n.isRead).length;
+      const banks = safe(results[5]);
+      const notifs = safe(results[6]);
+      const unread = notifs.filter((n) => !n.read && !n.isRead).length;
 
-      // Count only PAYMENT_VERIFICATION_PENDING requests
       let pendingPayments = 0;
       try {
         const payList = payRaw ? JSON.parse(payRaw) : [];
         pendingPayments = Array.isArray(payList)
-          ? payList.filter(p => p.paymentStatus === PAY_PENDING).length
+          ? payList.filter((p) => p.paymentStatus === PAY_PENDING).length
           : 0;
       } catch {
         pendingPayments = 0;
       }
 
-      // Merge dealer-registered users into applications count
-      let dealerUserCount = 0;
-      try {
-        const du = dealerUsersRaw ? JSON.parse(dealerUsersRaw) : [];
-        dealerUserCount = Array.isArray(du) ? du.length : 0;
-      } catch {}
-
       setStats({
-        users:        users.length,
-        dealers:      dealers.length,
-        pendingDocs:  pending.length,
+        users: users.length,
+        dealers: dealers.length,
+        pendingDocs: pending.length,
         verifiedDocs: verified.length,
         applications: applications.length,
-        banks:        banks.length,
-        notifications:unread,
-        payments:     pendingPayments,
+        banks: banks.length,
+        notifications: unread,
+        payments: pendingPayments,
       });
     } catch {
       Toast.show({ type: 'error', text1: 'Failed to load dashboard' });
@@ -140,13 +143,17 @@ const AdminDashboardScreen = ({ navigation }) => {
     }
   }, []);
 
-  // Auto-refresh counts when screen comes into focus (e.g. returning from AdminPayments)
-  useFocusEffect(useCallback(() => {
-    loadData();
-  }, [loadData]));
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData])
+  );
 
   const handleMenuSelect = (name) => {
-    if (name === 'Dashboard') { setSidebarOpen(false); return; }
+    if (name === 'Dashboard') {
+      setSidebarOpen(false);
+      return;
+    }
     const screen = NAV_MAP[name];
     if (screen) navigation.navigate(screen);
   };
@@ -156,9 +163,12 @@ const AdminDashboardScreen = ({ navigation }) => {
     navigation.replace('Login');
   };
 
+  const adminName = adminData?.name || adminData?.fullName || 'Admin';
+  const initial = adminName.charAt(0).toUpperCase();
+
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
+      <StatusBar barStyle="light-content" backgroundColor="#0B2A4A" />
 
       <Sidebar
         visible={sidebarOpen}
@@ -170,60 +180,158 @@ const AdminDashboardScreen = ({ navigation }) => {
         role="ADMIN"
       />
 
-      <View style={styles.topBar}>
-        <TouchableOpacity onPress={() => setSidebarOpen(true)} style={styles.menuBtn}>
+      <View style={styles.header}>
+        <TouchableOpacity
+          onPress={() => setSidebarOpen(true)}
+          style={styles.menuBtn}
+          activeOpacity={0.7}
+        >
           <Text style={styles.menuBtnText}>☰</Text>
         </TouchableOpacity>
-        <Text style={styles.pageTitle}>Admin Dashboard</Text>
-        <TouchableOpacity onPress={() => { setRefreshing(true); loadData(); }} style={styles.refreshBtn}>
-          <Text style={styles.refreshBtnText}>↻</Text>
-        </TouchableOpacity>
-        <View style={styles.avatarCircle}>
-          <Text style={styles.avatarText}>
-            {(adminData?.name || adminData?.fullName || 'A').charAt(0).toUpperCase()}
-          </Text>
+
+        <View style={styles.headerTitleWrap}>
+          <Text style={styles.pageTitle}>Dashboard</Text>
+          <Text style={styles.pageSubTitle}>Welcome back, {adminName}</Text>
+        </View>
+
+        <View style={styles.headerRight}>
+          <TouchableOpacity
+            style={styles.bellBtn}
+            onPress={() => {
+              setRefreshing(true);
+              loadData();
+            }}
+            activeOpacity={0.7}
+          >
+            <AdminIcon name="Bell" size={18} color="#F59E0B" />
+            {stats.notifications > 0 && (
+              <View style={styles.badgeWrap}>
+                <Text style={styles.badgeText}>{stats.notifications}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          <View style={styles.avatarCircle}>
+            <Text style={styles.avatarText}>{initial}</Text>
+          </View>
         </View>
       </View>
 
       {loading ? (
-        <ActivityIndicator size="large" color={COLORS.accent} style={styles.center} />
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color="#24D1C2" />
+        </View>
       ) : (
         <ScrollView
           style={styles.content}
+          showsVerticalScrollIndicator={false}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} />
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => {
+                setRefreshing(true);
+                loadData();
+              }}
+              colors={['#24D1C2']}
+            />
           }
         >
-          <View style={styles.welcomeCard}>
-            <Text style={styles.welcomeText}>
-              Welcome back, {adminData?.name || adminData?.fullName || 'Admin'} 👋
-            </Text>
-            <Text style={styles.welcomeSub}>Vahan Finserv Admin Panel</Text>
-          </View>
+          <View style={styles.statGrid}>
+            <View style={styles.statCard}>
+              <View style={styles.statTopRow}>
+                <View style={[styles.statIconBox, { backgroundColor: '#EEF2FF' }]}>
+                  <AdminIcon name="Documents" size={20} color="#3B82F6" />
+                </View>
+                <Text style={styles.statValue}>{stats.applications}</Text>
+              </View>
+              <Text style={styles.statLabel}>Total Applications</Text>
+              <View style={[styles.statAccentBar, { backgroundColor: '#6366F1' }]} />
+            </View>
 
-          <Text style={styles.sectionTitle}>Overview</Text>
-          <StatCard label="Total Users" value={stats.users} emoji="👥" color={COLORS.accent} />
-          <StatCard label="Total Dealers" value={stats.dealers} emoji="🤝" color="#F59E0B" />
-          <StatCard label="Pending Documents" value={stats.pendingDocs} emoji="⏳" color="#EF4444" />
-          <StatCard label="Verified Documents" value={stats.verifiedDocs} emoji="✅" color="#10B981" />
-          <StatCard label="Total Applications" value={stats.applications} emoji="📋" color={COLORS.primary} />
-          <StatCard label="Active Banks" value={stats.banks} emoji="🏦" color="#8B5CF6" />
-          <StatCard label="Unread Notifications" value={stats.notifications} emoji="🔔" color="#0EA5E9" />
-          <StatCard label="Payment Requests" value={stats.payments} emoji="💳" color="#F59E0B" />
+            <View style={styles.statCard}>
+              <View style={styles.statTopRow}>
+                <View style={[styles.statIconBox, { backgroundColor: '#F3E8FF' }]}>
+                  <AdminIcon name="Banks" size={20} color="#8B5CF6" />
+                </View>
+                <Text style={styles.statValue}>{stats.banks}</Text>
+              </View>
+              <Text style={styles.statLabel}>Active Banks</Text>
+              <View style={[styles.statAccentBar, { backgroundColor: '#8B5CF6' }]} />
+            </View>
+
+            <View style={styles.statCard}>
+              <View style={styles.statTopRow}>
+                <View style={[styles.statIconBox, { backgroundColor: '#FEF3C7' }]}>
+                  <AdminIcon name="Bell" size={20} color="#F59E0B" />
+                </View>
+                <Text style={styles.statValue}>{stats.notifications}</Text>
+              </View>
+              <Text style={styles.statLabel}>Unread Notifications</Text>
+              <View style={[styles.statAccentBar, { backgroundColor: '#F59E0B' }]} />
+            </View>
+
+            <View style={styles.statCard}>
+              <View style={styles.statTopRow}>
+                <View style={[styles.statIconBox, { backgroundColor: '#ECFDF5' }]}>
+                  <AdminIcon name="Payments" size={20} color="#10B981" />
+                </View>
+                <Text style={styles.statValue}>{stats.payments}</Text>
+              </View>
+              <Text style={styles.statLabel}>Payment Requests</Text>
+              <View style={[styles.statAccentBar, { backgroundColor: '#10B981' }]} />
+            </View>
+          </View>
 
           <Text style={styles.sectionTitle}>Quick Access</Text>
           <View style={styles.quickGrid}>
-            {QUICK_LINKS.map((q) => (
+            {QUICK_ACCESS_TILES.map((item) => (
               <TouchableOpacity
-                key={q.screen}
-                style={[styles.quickCard, { borderTopColor: q.color }]}
-                onPress={() => navigation.navigate(q.screen)}
+                key={item.screen}
+                style={styles.quickTile}
+                onPress={() => navigation.navigate(item.screen)}
+                activeOpacity={0.8}
               >
-                <Text style={styles.quickEmoji}>{q.emoji}</Text>
-                <Text style={styles.quickLabel}>{q.label}</Text>
+                <View style={[styles.quickIconBox, { backgroundColor: item.bg }]}>
+                  <AdminIcon name={item.name} size={22} color={item.iconColor} />
+                </View>
+                <Text style={styles.quickTileLabel}>{item.label}</Text>
               </TouchableOpacity>
             ))}
           </View>
+
+          <View style={styles.bannerCard}>
+            <View style={styles.bannerLeft}>
+              <Text style={styles.bannerTitle}>Secure. Fast. Reliable.</Text>
+              <Text style={styles.bannerSubTitle}>
+                Manage your operations efficiently and securely.
+              </Text>
+              <View style={styles.bannerDots}>
+                <View style={[styles.dot, styles.dotActive]} />
+                <View style={styles.dot} />
+                <View style={styles.dot} />
+              </View>
+            </View>
+            <View style={styles.bannerRight}>
+              <View style={styles.bannerShieldCircle}>
+                <AdminIcon name="Shield" size={42} color="#FFFFFF" />
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.statusCard}>
+            <View style={styles.statusLeft}>
+              <View style={styles.statusIconBox}>
+                <AdminIcon name="Briefcase" size={18} color="#3B82F6" />
+              </View>
+              <View>
+                <Text style={styles.statusTitle}>System Status</Text>
+                <Text style={styles.statusSub}>All systems operational</Text>
+              </View>
+            </View>
+            <View style={styles.activeDot} />
+          </View>
+
+          <View style={{ height: 28 }} />
         </ScrollView>
       )}
     </SafeAreaView>
@@ -231,45 +339,306 @@ const AdminDashboardScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: COLORS.primary },
-  topBar: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: COLORS.primary, paddingHorizontal: SPACING.md,
-     paddingVertical: 15,
-    paddingTop: 20, gap: SPACING.sm,
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#0B2A4A',
   },
-  menuBtn: { padding: SPACING.xs },
-  menuBtnText: { color: COLORS.white, fontSize: 22 },
-  pageTitle: { flex: 1, color: COLORS.white, fontSize: 18, fontWeight: '700' },
-  refreshBtn: { padding: SPACING.xs },
-  refreshBtnText: { color: COLORS.accent, fontSize: 22, fontWeight: '700' },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0B2A4A',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    paddingTop: Platform.OS === 'android' ? 16 : 14,
+  },
+  menuBtn: {
+    padding: 4,
+    marginRight: 12,
+  },
+  menuBtnText: {
+    color: '#FFFFFF',
+    fontSize: 24,
+    fontWeight: '600',
+  },
+  headerTitleWrap: {
+    flex: 1,
+  },
+  pageTitle: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+  },
+  pageSubTitle: {
+    color: 'rgba(255, 255, 255, 0.65)',
+    fontSize: 12,
+    marginTop: 2,
+    fontWeight: '500',
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  bellBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  badgeWrap: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: '#EF4444',
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '800',
+  },
   avatarCircle: {
-    width: 36, height: 36, borderRadius: 18,
-    backgroundColor: COLORS.accent, alignItems: 'center', justifyContent: 'center',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#24D1C2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 3,
+    shadowColor: '#24D1C2',
+    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
   },
-  avatarText: { color: COLORS.primary, fontWeight: '800', fontSize: 14 },
-  content: { flex: 1, backgroundColor: COLORS.background, padding: SPACING.md },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.background },
-  welcomeCard: {
-    backgroundColor: COLORS.primary, borderRadius: RADIUS.lg,
-    padding: SPACING.lg, marginBottom: SPACING.md,
+  avatarText: {
+    color: '#FFFFFF',
+    fontWeight: '900',
+    fontSize: 16,
   },
-  welcomeText: { color: COLORS.white, fontSize: 18, fontWeight: '700' },
-  welcomeSub: { color: '#8fa3c7', fontSize: 13, marginTop: 4 },
+  content: {
+    flex: 1,
+    backgroundColor: '#F5F7FA',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 18,
+    paddingTop: 20,
+  },
+  center: {
+    flex: 1,
+    backgroundColor: '#F5F7FA',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 14,
+    marginBottom: 24,
+  },
+  statCard: {
+    width: '47.5%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 16,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 6,
+    borderWidth: 1,
+    borderColor: '#F0F3F8',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  statTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 10,
+  },
+  statIconBox: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statValue: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: '#10233F',
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '600',
+    lineHeight: 16,
+  },
+  statAccentBar: {
+    height: 3,
+    borderRadius: 2,
+    marginTop: 12,
+    width: '50%',
+  },
   sectionTitle: {
-    fontSize: 15, fontWeight: '700', color: COLORS.text,
-    marginBottom: SPACING.sm, marginTop: SPACING.xs,
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#10233F',
+    marginBottom: 14,
   },
   quickGrid: {
-    flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm, marginBottom: SPACING.xl,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 24,
   },
-  quickCard: {
-    width: '30%', flexGrow: 1, backgroundColor: COLORS.white,
-    borderRadius: RADIUS.md, padding: SPACING.md, alignItems: 'center',
-    borderTopWidth: 3, elevation: 2,
+  quickTile: {
+    width: '30.5%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    paddingVertical: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 5,
+    borderWidth: 1,
+    borderColor: '#F0F3F8',
   },
-  quickEmoji: { fontSize: 26, marginBottom: SPACING.xs },
-  quickLabel: { fontSize: 12, fontWeight: '600', color: COLORS.text },
+  quickIconBox: {
+    width: 50,
+    height: 50,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  quickTileLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#10233F',
+  },
+  bannerCard: {
+    backgroundColor: '#E0F2FE',
+    borderRadius: 20,
+    padding: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    elevation: 2,
+    shadowColor: '#0EA5E9',
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 3 },
+    shadowRadius: 6,
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+  },
+  bannerLeft: {
+    flex: 1,
+  },
+  bannerTitle: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#0369A1',
+  },
+  bannerSubTitle: {
+    fontSize: 12,
+    color: '#0284C7',
+    marginTop: 4,
+    lineHeight: 17,
+    fontWeight: '500',
+  },
+  bannerDots: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 14,
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#93C5FD',
+  },
+  dotActive: {
+    width: 18,
+    backgroundColor: '#0284C7',
+  },
+  bannerRight: {
+    marginLeft: 12,
+  },
+  bannerShieldCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#0EA5E9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 4,
+    shadowColor: '#0EA5E9',
+    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 8,
+  },
+  statusCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 5,
+    borderWidth: 1,
+    borderColor: '#F0F3F8',
+    marginBottom: 16,
+  },
+  statusLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  statusIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#EFF6FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#10233F',
+  },
+  statusSub: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#10B981',
+    marginTop: 2,
+  },
+  activeDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#10B981',
+  },
 });
 
 export default AdminDashboardScreen;

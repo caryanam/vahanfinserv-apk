@@ -249,53 +249,61 @@ const AdminDocumentsScreen = ({ navigation, route }) => {
         )}
 
         {/* Action buttons */}
-        <View style={styles.actions}>
-          {/* Preview — always visible */}
-          <TouchableOpacity
-            style={[styles.btn, styles.btnPreview]}
-            disabled={!!isActing}
-            onPress={() => handlePreview(id, fileName)}
-          >
-            {isActing && actionLoading === `${id}_preview`
-              ? <ActivityIndicator size="small" color={COLORS.accent} />
-              : <Text style={styles.btnPreviewText}>👁 Preview</Text>
-            }
-          </TouchableOpacity>
+        <View style={styles.actionSection}>
+          {/* Row 1: Preview & Download */}
+          <View style={styles.btnRow}>
+            <TouchableOpacity
+              style={[styles.btn, styles.btnPreview]}
+              disabled={!!isActing}
+              onPress={() => handlePreview(id, fileName)}
+              activeOpacity={0.8}
+            >
+              {isActing && actionLoading === `${id}_preview` ? (
+                <ActivityIndicator size="small" color="#059669" />
+              ) : (
+                <Text style={styles.btnPreviewText}>👁 Preview</Text>
+              )}
+            </TouchableOpacity>
 
-          {/* Download — always visible */}
-          <TouchableOpacity
-            style={[styles.btn, styles.btnDownload]}
-            disabled={!!isActing}
-            onPress={() => handleDownload(id, fileName)}
-          >
-            <Text style={styles.btnDownloadText}>⬇ Download</Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.btn, styles.btnDownload]}
+              disabled={!!isActing}
+              onPress={() => handleDownload(id, fileName)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.btnDownloadText}>⬇ Download</Text>
+            </TouchableOpacity>
+          </View>
 
-          {/* Approve & Reject — only for PENDING / PAYMENT_VERIFICATION_PENDING */}
+          {/* Row 2: Approve & Reject (only for PENDING / PAYMENT_VERIFICATION_PENDING) */}
           {isActionable && (
-            <>
+            <View style={[styles.btnRow, { marginTop: 10 }]}>
               <TouchableOpacity
                 style={[styles.btn, styles.btnApprove, isActing && { opacity: 0.6 }]}
                 disabled={!!isActing}
                 onPress={() => handleApprove(id)}
+                activeOpacity={0.85}
               >
-                {isActing && actionLoading === `${id}_approve`
-                  ? <ActivityIndicator size="small" color={COLORS.white} />
-                  : <Text style={styles.btnWhiteText}>✓ Approve</Text>
-                }
+                {isActing && actionLoading === `${id}_approve` ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.btnWhiteText}>✓ Approve</Text>
+                )}
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={[styles.btn, styles.btnReject, isActing && { opacity: 0.6 }]}
                 disabled={!!isActing}
                 onPress={() => openRejectModal(id)}
+                activeOpacity={0.85}
               >
-                {isActing && actionLoading === `${id}_reject`
-                  ? <ActivityIndicator size="small" color={COLORS.white} />
-                  : <Text style={styles.btnWhiteText}>✗ Reject</Text>
-                }
+                {isActing && actionLoading === `${id}_reject` ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.btnWhiteText}>✗ Reject</Text>
+                )}
               </TouchableOpacity>
-            </>
+            </View>
           )}
         </View>
       </View>
@@ -444,8 +452,18 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SPACING.xl },
   emptyText: { color: COLORS.textSecondary, fontSize: 14 },
   card: {
-    backgroundColor: COLORS.white, borderRadius: RADIUS.md,
-    padding: SPACING.md, marginBottom: SPACING.sm, elevation: 2,
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 14,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 6,
+    borderWidth: 1,
+    borderColor: '#F0F3F8',
+    overflow: 'hidden',
   },
   cardRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SPACING.sm },
   docIcon: {
@@ -474,18 +492,25 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: COLORS.accent,
   },
   remarkSaveBtnText: { color: COLORS.accent, fontSize: 12, fontWeight: '700' },
-  actions: { flexDirection: 'row', gap: SPACING.sm, marginTop: SPACING.sm, flexWrap: 'wrap' },
+  actionSection: { marginTop: 14 },
+  btnRow: { flexDirection: 'row', gap: 10 },
   btn: {
-    flex: 1, paddingVertical: 8, borderRadius: RADIUS.sm,
-    alignItems: 'center', justifyContent: 'center', minWidth: 80,
+    flex: 1, height: 42, borderRadius: 12,
+    alignItems: 'center', justifyContent: 'center',
   },
-  btnPreview: { backgroundColor: `${COLORS.accent}18`, borderWidth: 1, borderColor: COLORS.accent },
-  btnPreviewText: { color: COLORS.accent, fontSize: 12, fontWeight: '700' },
-  btnDownload: { backgroundColor: `${COLORS.primary}12`, borderWidth: 1, borderColor: COLORS.primary },
-  btnDownloadText: { color: COLORS.primary, fontSize: 12, fontWeight: '700' },
-  btnApprove: { backgroundColor: '#10B981' },
-  btnReject: { backgroundColor: '#EF4444' },
-  btnWhiteText: { color: COLORS.white, fontSize: 12, fontWeight: '700' },
+  btnPreview: { backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#A7F3D0' },
+  btnPreviewText: { color: '#059669', fontSize: 13, fontWeight: '700' },
+  btnDownload: { backgroundColor: '#F0F4FF', borderWidth: 1, borderColor: '#C7D2FE' },
+  btnDownloadText: { color: '#4F46E5', fontSize: 13, fontWeight: '700' },
+  btnApprove: {
+    backgroundColor: '#10B981', elevation: 2,
+    shadowColor: '#10B981', shadowOpacity: 0.25, shadowOffset: { width: 0, height: 2 }, shadowRadius: 4,
+  },
+  btnReject: {
+    backgroundColor: '#EF4444', elevation: 2,
+    shadowColor: '#EF4444', shadowOpacity: 0.25, shadowOffset: { width: 0, height: 2 }, shadowRadius: 4,
+  },
+  btnWhiteText: { color: COLORS.white, fontSize: 13, fontWeight: '800' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modalBox: {
     backgroundColor: COLORS.white, borderTopLeftRadius: RADIUS.xl,

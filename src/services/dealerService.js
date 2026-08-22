@@ -52,3 +52,20 @@ export const dealerResetPassword = async (dto) => {
   const response = await api.post('/dealer/reset-password', dto, { skipAuth: true });
   return response.data;
 };
+
+export const dealerSendMobileOtp = async (mobile) => {
+  console.log('[Dealer] Sending mobile registration OTP to:', mobile);
+  const response = await api.post(
+    `/dealer/register/send-mobile-otp?mobileNumber=${encodeURIComponent(mobile)}`,
+    null,
+    { skipAuth: true },
+  );
+  return response.data;
+};
+
+export const dealerRegisterVerifyMobileOtp = async (dto) => {
+  // dto: { mobile, otp }
+  console.log('[Dealer] Verifying mobile registration OTP');
+  const response = await api.post('/dealer/register/verify-mobile-otp', dto, { skipAuth: true });
+  return response.data;
+};

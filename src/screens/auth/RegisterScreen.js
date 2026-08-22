@@ -20,11 +20,15 @@ import {
   registerUser,
   userRegisterVerifyOtp,
   userSendRegisterOtp,
+  userSendMobileOtp,
+  userRegisterVerifyMobileOtp,
 } from '../../services/customerService';
 import {
   registerDealer,
   dealerRegisterVerifyOtp,
   dealerSendRegisterOtp,
+  dealerSendMobileOtp,
+  dealerRegisterVerifyMobileOtp,
 } from '../../services/dealerService';
 import { SPACING } from '../../constants/theme';
 import Toast from 'react-native-toast-message';
@@ -41,6 +45,13 @@ const RegisterScreen = ({ navigation, route }) => {
   const [otpVerifying, setOtpVerifying] = useState(false);
   const [otpVerified, setOtpVerified] = useState(false);
   const [resendTimer, setResendTimer] = useState(0);
+
+  // Mobile OTP state
+  const [mobileOtp, setMobileOtp] = useState('');
+  const [mobileOtpSending, setMobileOtpSending] = useState(false);
+  const [mobileOtpVerifying, setMobileOtpVerifying] = useState(false);
+  const [mobileOtpVerified, setMobileOtpVerified] = useState(false);
+  const [mobileResendTimer, setMobileResendTimer] = useState(0);
 
   const [form, setForm] = useState({
     fullName: '',
@@ -62,9 +73,24 @@ const RegisterScreen = ({ navigation, route }) => {
   }, [resendTimer]);
 
   useEffect(() => {
+    if (mobileResendTimer <= 0) {
+      return undefined;
+    }
+
+    const timer = setTimeout(() => {
+      setMobileResendTimer((prev) => prev - 1);
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [mobileResendTimer]);
+
+  useEffect(() => {
     setOtp('');
     setOtpVerified(false);
     setResendTimer(0);
+    setMobileOtp('');
+    setMobileOtpVerified(false);
+    setMobileResendTimer(0);
   }, [role]);
 
   const handleChange = (field, value) => {
@@ -73,6 +99,10 @@ const RegisterScreen = ({ navigation, route }) => {
         ...prev,
         mobile: value.replace(/\D/g, '').slice(0, 10),
       }));
+      // Reset mobile OTP whenever number changes
+      setMobileOtp('');
+      setMobileOtpVerified(false);
+      setMobileResendTimer(0);
       return;
     }
 
@@ -90,6 +120,79 @@ const RegisterScreen = ({ navigation, route }) => {
   const handleOtpChange = (value) => {
     const digits = value.replace(/\D/g, '').slice(0, 6);
     setOtp(digits);
+  };
+
+  const handleMobileOtpChange = (value) => {
+    setMobileOtp(value.replace(/\D/g, '').slice(0, 6));
+  };
+
+  const handleSendMobileOtp = async () => {
+    const mobile = form.mobile.trim();
+
+    if (!/^\d{10}$/.test(mobile)) {
+      Toast.show({ type: 'error', text1: 'Please enter a valid 10-digit mobile number' });
+      return;
+    }
+
+    setMobileOtpSending(true);
+
+    try {
+      const response = role === 'DEALER'
+        ? await dealerSendMobileOtp(mobile)
+        : await userSendMobileOtp(mobile);
+
+      setMobileOtp('');
+      setMobileOtpVerified(false);
+      setMobileResendTimer(60);
+      Toast.show({
+        type: 'success',
+        text1: response?.message || 'OTP sent to your mobile number',
+      });
+    } catch (err) {
+      Toast.show({
+        type: 'error',
+        text1: err?.response?.data?.message || err?.response?.data || err?.message || 'Failed to send mobile OTP',
+      });
+    } finally {
+      setMobileOtpSending(false);
+    }
+  };
+
+  const handleVerifyMobileOtp = async () => {
+    const mobile = form.mobile.trim();
+
+    if (!/^\d{10}$/.test(mobile)) {
+      Toast.show({ type: 'error', text1: 'Please enter a valid 10-digit mobile number' });
+      return;
+    }
+
+    if (!/^\d{6}$/.test(mobileOtp)) {
+      Toast.show({ type: 'error', text1: 'OTP should be 6 digits' });
+      return;
+    }
+
+    setMobileOtpVerifying(true);
+
+    try {
+      const payload = { mobileNumber: mobile, otp: mobileOtp };
+      const response = role === 'DEALER'
+        ? await dealerRegisterVerifyMobileOtp(payload)
+        : await userRegisterVerifyMobileOtp(payload);
+
+      setMobileOtpVerified(true);
+      setMobileResendTimer(0);
+      Toast.show({
+        type: 'success',
+        text1: response?.message || 'Mobile number verified successfully',
+      });
+    } catch (err) {
+      Toast.show({
+        type: 'error',
+        text1: err?.response?.data?.message || err?.response?.data || err?.message || 'Mobile OTP verification failed',
+      });
+    } finally {
+      setMobileOtpVerifying(false);
+    }
   };
 
   const handleSendOtp = async () => {
@@ -174,6 +277,14 @@ const RegisterScreen = ({ navigation, route }) => {
 
     if (!/^\d{10}$/.test(form.mobile)) {
       Toast.show({ type: 'error', text1: 'Mobile number should be 10 digits' });
+      return;
+    }
+
+    if (!mobileOtpVerified) {
+      Toast.show({
+        type: 'error',
+        text1: 'Please verify your mobile number first',
+      });
       return;
     }
 
@@ -338,7 +449,71 @@ const RegisterScreen = ({ navigation, route }) => {
                 value={form.mobile}
                 onChangeText={(v) => handleChange('mobile', v)}
               />
+              {mobileOtpVerified && (
+                <Text style={styles.verifiedBadge}>✓</Text>
+              )}
             </View>
+
+            {/* ── Mobile OTP Verification ── */}
+            <Text style={styles.label}>Mobile Verification</Text>
+            <View style={styles.otpRow}>
+              <View style={styles.otpInputWrap}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter 6-digit OTP"
+                  placeholderTextColor="rgba(255,255,255,0.65)"
+                  keyboardType="number-pad"
+                  maxLength={6}
+                  value={mobileOtp}
+                  onChangeText={handleMobileOtpChange}
+                  editable={!mobileOtpVerified}
+                />
+              </View>
+
+              <TouchableOpacity
+                style={[
+                  styles.otpBtn,
+                  (mobileOtpSending || mobileResendTimer > 0) && styles.otpBtnDisabled,
+                ]}
+                onPress={handleSendMobileOtp}
+                disabled={mobileOtpSending || mobileResendTimer > 0}
+                activeOpacity={0.85}
+              >
+                {mobileOtpSending ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.otpBtnText}>
+                    {mobileResendTimer > 0 ? `Resend ${mobileResendTimer}s` : 'Send OTP'}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.otpActionRow}>
+              <TouchableOpacity
+                style={[
+                  styles.otpVerifyBtn,
+                  (mobileOtpVerifying || mobileOtpVerified || !mobileOtp) && styles.otpVerifyBtnDisabled,
+                ]}
+                onPress={handleVerifyMobileOtp}
+                disabled={mobileOtpVerifying || mobileOtpVerified || !mobileOtp}
+                activeOpacity={0.85}
+              >
+                {mobileOtpVerifying ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.otpVerifyBtnText}>
+                    {mobileOtpVerified ? 'Verified ✓' : 'Verify OTP'}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+
+            <Text style={[styles.otpHint, mobileOtpVerified && styles.otpVerifiedText]}>
+              {mobileOtpVerified
+                ? 'Mobile number verified successfully.'
+                : 'A 6-digit OTP will be sent to your mobile number via SMS.'}
+            </Text>
 
             <Text style={styles.label}>Email</Text>
             <View style={styles.inputWrap}>
@@ -426,9 +601,9 @@ const RegisterScreen = ({ navigation, route }) => {
             </View>
 
             <TouchableOpacity
-              style={[styles.submitBtn, (loading || !otpVerified) && styles.submitBtnDisabled]}
+              style={[styles.submitBtn, (loading || !otpVerified || !mobileOtpVerified) && styles.submitBtnDisabled]}
               onPress={handleSubmit}
-              disabled={loading || !otpVerified}
+              disabled={loading || !otpVerified || !mobileOtpVerified}
               activeOpacity={0.85}
             >
               {loading ? (
@@ -730,6 +905,13 @@ const styles = StyleSheet.create({
     fontSize: 18,
     marginRight: 8,
     color: '#FFFFFF',
+  },
+
+  verifiedBadge: {
+    fontSize: 18,
+    color: '#19D3D0',
+    fontWeight: '900',
+    marginLeft: 6,
   },
 
   input: {
