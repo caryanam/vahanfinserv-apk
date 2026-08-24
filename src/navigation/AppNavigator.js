@@ -40,6 +40,7 @@ import LoanStatusScreen from '../screens/customer/LoanStatusScreen';
 import ServicesScreen from '../screens/customer/ServicesScreen';
 import RCVerificationScreen from '../screens/customer/RCVerificationScreen';
 import EChallanScreen from '../screens/customer/EChallanScreen';
+import NotificationScreen from '../screens/NotificationScreen';
 
 // Legal compliance screens
 import PrivacyPolicyScreen from '../screens/legal/PrivacyPolicyScreen';
@@ -114,6 +115,8 @@ const AppNavigator = ({navigationRef}) => {
         <Stack.Screen name="Services" component={ServicesScreen} />
         <Stack.Screen name="RCVerification" component={RCVerificationScreen} />
         <Stack.Screen name="EChallan" component={EChallanScreen} />
+
+        <Stack.Screen name="Notification" component={NotificationScreen} />
 
         {/* Legal compliant screens */}
         <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />

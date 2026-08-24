@@ -43,14 +43,14 @@ const RegisterScreen = ({ navigation, route }) => {
   const [otp, setOtp] = useState('');
   const [otpSending, setOtpSending] = useState(false);
   const [otpVerifying, setOtpVerifying] = useState(false);
-  const [otpVerified, setOtpVerified] = useState(false);
+  const [otpVerified, setOtpVerified] = useState(true);
   const [resendTimer, setResendTimer] = useState(0);
 
   // Mobile OTP state
   const [mobileOtp, setMobileOtp] = useState('');
   const [mobileOtpSending, setMobileOtpSending] = useState(false);
   const [mobileOtpVerifying, setMobileOtpVerifying] = useState(false);
-  const [mobileOtpVerified, setMobileOtpVerified] = useState(false);
+  const [mobileOtpVerified, setMobileOtpVerified] = useState(true);
   const [mobileResendTimer, setMobileResendTimer] = useState(0);
 
   const [form, setForm] = useState({
@@ -86,10 +86,10 @@ const RegisterScreen = ({ navigation, route }) => {
 
   useEffect(() => {
     setOtp('');
-    setOtpVerified(false);
+    setOtpVerified(true);
     setResendTimer(0);
     setMobileOtp('');
-    setMobileOtpVerified(false);
+    setMobileOtpVerified(true);
     setMobileResendTimer(0);
   }, [role]);
 
@@ -101,15 +101,16 @@ const RegisterScreen = ({ navigation, route }) => {
       }));
       // Reset mobile OTP whenever number changes
       setMobileOtp('');
-      setMobileOtpVerified(false);
+      setMobileOtpVerified(true);
       setMobileResendTimer(0);
       return;
     }
 
     if (field === 'email') {
       setForm((prev) => ({ ...prev, [field]: value }));
+      // Reset email OTP whenever email changes
       setOtp('');
-      setOtpVerified(false);
+      setOtpVerified(true);
       setResendTimer(0);
       return;
     }

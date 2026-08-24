@@ -197,10 +197,7 @@ const AdminDashboardScreen = ({ navigation }) => {
         <View style={styles.headerRight}>
           <TouchableOpacity
             style={styles.bellBtn}
-            onPress={() => {
-              setRefreshing(true);
-              loadData();
-            }}
+            onPress={() => navigation.navigate('Notification')}
             activeOpacity={0.7}
           >
             <AdminIcon name="Bell" size={18} color="#F59E0B" />

@@ -16,7 +16,10 @@ import {
   Image,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getUserDocuments, downloadDocumentToStorage } from '../../services/documentService';
+import DocumentPicker from 'react-native-document-picker';
+import { launchCamera } from 'react-native-image-picker';
+import api from '../../services/api';
+import { getUserDocuments, downloadDocumentToStorage, clearDocumentCache } from '../../services/documentService';
 import { getUserProfile } from '../../services/customerService';
 import {
   READY2DRIVE_TOTAL_AMOUNT,
@@ -29,9 +32,23 @@ import {
 import DocumentPreviewModal from '../../components/common/DocumentPreviewModal';
 import { COLORS, SPACING, RADIUS } from '../../constants/theme';
 import Toast from 'react-native-toast-message';
+import Sidebar from '../../components/common/Sidebar';
+
+const CUSTOMER_MENU = [
+  { name: 'Dashboard' },
+  { name: 'Applications' },
+  { name: 'Documents' },
+  { name: 'Profile' },
+  { name: 'Legal' },
+];
 
 // ── Banner illustration ──
-const CAR_SHIELD_IMG = require('../../assets/car-shield.png');
+const CAR_SHIELD_IMG = require('../../assets/car-shield.jpg');
+
+const sanitizeFileName = (name, docType) => {
+  if (!name) return `${docType}_${Date.now()}.jpg`;
+  return name.replace(/[^a-zA-Z0-9._-]/g, '_');
+};
 
 const DOCUMENT_LABELS = {
   AADHAAR_1: 'Aadhaar Front Side',
@@ -103,6 +120,7 @@ const QuickItem = ({ icon, label, onPress, iconBg }) => (
 
 const CustomerDashboardScreen = ({ navigation }) => {
   const [activeTab, setActiveTab] = useState('Dashboard');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [userData, setUserData] = useState(null);
@@ -110,6 +128,8 @@ const CustomerDashboardScreen = ({ navigation }) => {
   const [documents, setDocuments] = useState([]);
   const [docStats, setDocStats] = useState({ total: 0, pending: 0, approved: 0, rejected: 0 });
   const [previewDoc, setPreviewDoc] = useState(null);
+  const [reuploadingId, setReuploadingId] = useState(null);
+  const [reuploadedMap, setReuploadedMap] = useState({});
 
   const regType = String(profile?.registrationType || userData?.registrationType || '').toUpperCase().trim();
   const isPaid =
@@ -133,13 +153,27 @@ const CustomerDashboardScreen = ({ navigation }) => {
       const docList = docsRes.status === 'fulfilled'
         ? (docsRes.value?.data?.data || docsRes.value?.data || [])
         : [];
-      const docs = Array.isArray(docList) ? docList : [];
+      let docs = Array.isArray(docList) ? docList : [];
+      docs = docs.map(d => {
+        const did = String(d.documentId || d.id);
+        const reup = reuploadedMap[did];
+        if (reup) {
+          return {
+            ...d,
+            status: 'PENDING',
+            fileName: reup.fileName || d.fileName,
+            remarks: null,
+            rejectionReason: null,
+          };
+        }
+        return d;
+      });
       setDocuments(docs);
       setDocStats({
         total: docs.length,
-        pending: docs.filter(d => d.status === 'PENDING').length,
-        approved: docs.filter(d => d.status === 'APPROVED' || d.status === 'VERIFIED').length,
-        rejected: docs.filter(d => d.status === 'REJECTED').length,
+        pending: docs.filter(d => ['PENDING', 'UPLOADED'].includes(String(d.status || '').toUpperCase())).length,
+        approved: docs.filter(d => ['APPROVED', 'VERIFIED'].includes(String(d.status || '').toUpperCase())).length,
+        rejected: docs.filter(d => String(d.status || '').toUpperCase() === 'REJECTED').length,
       });
     } catch {
       Toast.show({ type: 'error', text1: 'Failed to load data' });
@@ -147,7 +181,7 @@ const CustomerDashboardScreen = ({ navigation }) => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [reuploadedMap]);
 
   useEffect(() => {
     (async () => {
@@ -161,6 +195,162 @@ const CustomerDashboardScreen = ({ navigation }) => {
       }
     })();
   }, [loadData]);
+
+  const executeDocumentUpload = async (doc, fileAsset) => {
+    const docId = doc.documentId || doc.id;
+    const rawType = doc.documentType || doc.type || 'DOCUMENT';
+    const userId = doc.userId || userData?.id;
+
+    if (!userId) {
+      throw new Error('User ID missing. Cannot upload document.');
+    }
+
+    const canonicalType = rawType;
+    const cleanName = sanitizeFileName(fileAsset.name, canonicalType);
+    setReuploadingId(docId);
+
+    // Clear old cached preview on device
+    if (docId) {
+      await clearDocumentCache(docId);
+    }
+
+    const formData = new FormData();
+    formData.append('userId', String(userId));
+    formData.append('type', canonicalType);
+    formData.append('documentType', canonicalType);
+    formData.append('status', 'PENDING');
+    formData.append('file', {
+      uri: Platform.OS === 'android' ? fileAsset.uri : fileAsset.uri.replace('file://', ''),
+      name: cleanName,
+      type: fileAsset.type || 'image/jpeg',
+    });
+
+    let uploadSuccess = false;
+
+    // 1. Delete old document record from backend so image binary is replaced
+    if (docId) {
+      try {
+        await api.delete(`/documents/${docId}`);
+      } catch (delErr) {
+        console.log('[UPLOAD] Delete old doc notice:', delErr?.message);
+      }
+    }
+
+    // 2. Upload new file via POST /documents/upload
+    try {
+      await api.post('/documents/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 30000,
+      });
+      uploadSuccess = true;
+    } catch (postErr) {
+      // 3. Try PUT /documents/{docId} if delete wasn't supported
+      try {
+        await api.put(`/documents/${docId}`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          timeout: 30000,
+        });
+        uploadSuccess = true;
+      } catch (putErr) {
+        const msg = (postErr?.response?.data?.message || putErr?.response?.data?.message || '').toLowerCase();
+        if (msg.includes('already uploaded')) {
+          uploadSuccess = true;
+        } else {
+          throw postErr || putErr;
+        }
+      }
+    }
+
+    // 4. Clear previous remarks and update status to PENDING
+    try {
+      await api.put(`/documents/${docId}/remarks`, { remarks: '' });
+    } catch {}
+    try {
+      await api.put(`/documents/status/${docId}?status=PENDING`);
+    } catch {}
+
+    if (uploadSuccess) {
+      setReuploadedMap((prev) => ({
+        ...prev,
+        [String(docId)]: { fileName: cleanName, status: 'PENDING' },
+      }));
+
+      setDocuments((prev) =>
+        prev.map((d) =>
+          (d.documentId || d.id) === docId
+            ? { ...d, status: 'PENDING', fileName: cleanName, remarks: null, rejectionReason: null }
+            : d
+        )
+      );
+
+      Toast.show({ type: 'success', text1: 'Document uploaded successfully — pending admin review' });
+      loadData(userData?.id);
+    }
+  };
+
+  const handleReuploadPickFile = async (doc) => {
+    try {
+      const result = await DocumentPicker.pickSingle({
+        type: [DocumentPicker.types.images, DocumentPicker.types.pdf],
+        copyTo: 'cachesDirectory',
+      });
+      const fileAsset = {
+        uri: result.fileCopyUri || result.uri,
+        name: result.name,
+        type: result.type || 'application/octet-stream',
+      };
+      await executeDocumentUpload(doc, fileAsset);
+    } catch (err) {
+      if (!DocumentPicker.isCancel(err)) {
+        Toast.show({
+          type: 'error',
+          text1: err?.response?.data?.message || err?.message || 'Upload failed',
+        });
+      }
+    } finally {
+      setReuploadingId(null);
+    }
+  };
+
+  const handleReuploadCamera = async (doc) => {
+    try {
+      const result = await launchCamera({
+        mediaType: 'photo',
+        quality: 0.8,
+        maxWidth: 1920,
+        maxHeight: 1920,
+        saveToPhotos: false,
+      });
+      if (result.didCancel) return;
+      if (result.errorCode) {
+        Toast.show({
+          type: 'error',
+          text1: result.errorCode === 'camera_unavailable'
+            ? 'Camera not available'
+            : result.errorMessage || 'Camera error',
+        });
+        return;
+      }
+      const asset = result.assets?.[0];
+      if (!asset || !asset.uri) return;
+
+      const docType = doc.documentType || doc.type || 'document';
+      const rawName = asset.fileName || `${docType}_${Date.now()}.jpg`;
+      const fileAsset = {
+        uri: asset.uri,
+        name: rawName,
+        type: asset.type || 'image/jpeg',
+      };
+      await executeDocumentUpload(doc, fileAsset);
+    } catch (err) {
+      Toast.show({
+        type: 'error',
+        text1: err?.response?.data?.message || err?.message || 'Upload failed',
+      });
+    } finally {
+      setReuploadingId(null);
+    }
+  };
 
   const handleApplyLoan = () => {
     const routes = navigation.getState()?.routeNames || [];
@@ -272,7 +462,17 @@ const CustomerDashboardScreen = ({ navigation }) => {
       </View>
 
       {/* Ready2Drive Package */}
-      <View style={styles.packageCard}>
+      <TouchableOpacity
+        style={styles.packageCard}
+        onPress={() => {
+          if (!isPaid) {
+            navigation.navigate('Payment', { userId: userData?.id, applicationNumber: `USER-${userData?.id}` });
+          } else {
+            Toast.show({ type: 'info', text1: 'You have already purchased this package' });
+          }
+        }}
+        activeOpacity={isPaid ? 1 : 0.85}
+      >
         <View style={styles.packageBadge}>
           <Text style={styles.packageBadgeShield}>🛡️</Text>
           <Text style={styles.packageBadgeStar}>⭐</Text>
@@ -291,16 +491,13 @@ const CustomerDashboardScreen = ({ navigation }) => {
           <View style={styles.packageDivider} />
           <Text style={styles.packageTotalLabel}>Total</Text>
           <Text style={styles.packageTotal}>{formatINR(READY2DRIVE_TOTAL_AMOUNT)}</Text>
-          {regType === 'INDIVIDUAL' && !isPaid && (
-            <TouchableOpacity
-              style={styles.payNowBtn}
-              onPress={() => navigation.navigate('Payment', { userId: userData?.id, applicationNumber: `USER-${userData?.id}` })}
-            >
+          {!isPaid && (
+            <View style={styles.payNowBtn}>
               <Text style={styles.payNowBtnText}>Pay →</Text>
-            </TouchableOpacity>
+            </View>
           )}
         </View>
-      </View>
+      </TouchableOpacity>
 
       {/* Quick Access */}
       <Text style={[styles.sectionTitle, { marginHorizontal: 16, marginTop: 22, marginBottom: 12 }]}>Quick Access</Text>
@@ -357,6 +554,42 @@ const CustomerDashboardScreen = ({ navigation }) => {
                   <Text style={styles.docDownloadBtnText}>⬇ Download</Text>
                 </TouchableOpacity>
               </View>
+
+              {reuploadingId === (item.documentId || item.id) ? (
+                <View style={styles.reuploadRow}>
+                  <View style={styles.reuploadingBox}>
+                    <ActivityIndicator size="small" color="#EF4444" />
+                    <Text style={styles.reuploadingText}>Updating document...</Text>
+                  </View>
+                </View>
+              ) : String(item.status || '').toUpperCase() === 'REJECTED' ? (
+                <View style={styles.reuploadRow}>
+                  <TouchableOpacity
+                    style={styles.reuploadCameraBtn}
+                    onPress={() => handleReuploadCamera(item)}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={styles.reuploadCameraBtnText}>📷 Camera</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.reuploadFileBtn}
+                    onPress={() => handleReuploadPickFile(item)}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={styles.reuploadFileBtnText}>📁 Re-upload</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View style={styles.reuploadRow}>
+                  <TouchableOpacity
+                    style={[styles.reuploadFileBtn, { backgroundColor: '#FFF7ED', borderColor: '#F97316' }]}
+                    onPress={() => handleReuploadPickFile(item)}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={[styles.reuploadFileBtnText, { color: '#EA580C' }]}>🔄 Replace</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
           );
         }}
@@ -467,6 +700,38 @@ const CustomerDashboardScreen = ({ navigation }) => {
     </ScrollView>
   );
 
+  const renderLegal = () => {
+    return (
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16 }}>
+        <Text style={styles.sectionTitle}>Legal & Policies</Text>
+        <View style={{ marginTop: 12, gap: 12 }}>
+          {[
+            { title: 'Privacy Policy', icon: '🛡️', screen: 'PrivacyPolicy', desc: 'Read our privacy policy and data protection terms' },
+            { title: 'Terms & Conditions', icon: '📝', screen: 'TermsConditions', desc: 'Read the terms of service and user agreements' },
+            { title: 'Refund Policy', icon: '💳', screen: 'RefundPolicy', desc: 'View details on payments, refunds, and cancellations' },
+            { title: 'Contact Us', icon: '📞', screen: 'ContactUs', desc: 'Reach out to our customer and partner support team' },
+          ].map((item, i) => (
+            <TouchableOpacity
+              key={i}
+              style={[styles.docCard, { flexDirection: 'row', alignItems: 'center', padding: 16 }]}
+              onPress={() => navigation.navigate(item.screen)}
+              activeOpacity={0.8}
+            >
+              <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                <Text style={{ fontSize: 20 }}>{item.icon}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 15, fontWeight: '700', color: '#1E293B' }}>{item.title}</Text>
+                <Text style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>{item.desc}</Text>
+              </View>
+              <Text style={{ fontSize: 18, color: '#94A3B8', fontWeight: '800' }}>›</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </ScrollView>
+    );
+  };
+
   const renderTabContent = () => {
     if (loading) {
       return <View style={styles.center}><ActivityIndicator size="large" color={COLORS.accent} /></View>;
@@ -476,6 +741,7 @@ const CustomerDashboardScreen = ({ navigation }) => {
       case 'Applications': return renderApplications();
       case 'Documents':    return renderDocuments();
       case 'Profile':      return renderProfile();
+      case 'Legal':        return renderLegal();
       default:             return renderDashboard();
     }
   };
@@ -486,14 +752,33 @@ const CustomerDashboardScreen = ({ navigation }) => {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
+      {/* Navigation Sidebar */}
+      <Sidebar
+        visible={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        menuItems={CUSTOMER_MENU}
+        activeMenu={activeTab}
+        onMenuSelect={(name) => setActiveTab(name)}
+        onLogout={handleLogout}
+        role="USER"
+      />
+
       {/* Top Bar */}
       <View style={styles.topBar}>
-        <TouchableOpacity style={styles.menuBtn} activeOpacity={0.7}>
+        <TouchableOpacity 
+          onPress={() => setSidebarOpen(true)} 
+          style={styles.menuBtn} 
+          activeOpacity={0.7}
+        >
           <Text style={styles.menuBtnText}>☰</Text>
         </TouchableOpacity>
-        <Text style={styles.pageTitle}>Dashboard</Text>
+        <Text style={styles.pageTitle}>{activeTab}</Text>
         <View style={styles.topBarRight}>
-          <TouchableOpacity style={styles.bellBtn} activeOpacity={0.7}>
+          <TouchableOpacity 
+            style={styles.bellBtn} 
+            onPress={() => navigation.navigate('Notification')}
+            activeOpacity={0.7}
+          >
             <Text style={styles.bellIcon}>🔔</Text>
           </TouchableOpacity>
           <View style={styles.avatarCircle}>
@@ -757,6 +1042,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#F0F4FF', borderWidth: 1, borderColor: '#C7D2FE', alignItems: 'center',
   },
   docDownloadBtnText: { color: '#4F46E5', fontSize: 12, fontWeight: '700' },
+  reuploadRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#FEE2E2' },
+  reuploadCameraBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#3B82F6', paddingVertical: 8, borderRadius: 8 },
+  reuploadCameraBtnText: { fontSize: 12, fontWeight: '700', color: '#1D4ED8' },
+  reuploadFileBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#EF4444', paddingVertical: 8, borderRadius: 8 },
+  reuploadFileBtnText: { fontSize: 12, fontWeight: '700', color: '#DC2626' },
+  reuploadingBox: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 6 },
+  reuploadingText: { fontSize: 12, color: '#EF4444', fontWeight: '600' },
   badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
   badgeText: { fontSize: 10, fontWeight: '700' },
   emptyText: { color: '#667085', fontSize: 14, marginTop: 8 },

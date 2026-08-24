@@ -79,12 +79,13 @@ const VehicleDocumentsScreen = ({navigation, route}) => {
       }
 
       const asset = result.assets?.[0];
-      if (asset) {
+      if (asset && asset.uri) {
+        const rawName = asset.fileName || `${docType}_${Date.now()}.jpg`;
         setFiles(prev => ({
           ...prev,
           [docType]: {
             uri: asset.uri,
-            name: sanitizeFileName(asset.fileName, docType),
+            name: sanitizeFileName(rawName, docType),
             type: asset.type || 'image/jpeg',
           },
         }));

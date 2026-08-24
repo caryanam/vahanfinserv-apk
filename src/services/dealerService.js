@@ -43,7 +43,10 @@ export const dealerSendRegisterOtp = async (email) => {
 
 export const dealerRegisterVerifyOtp = async (dto) => {
   console.log('[Dealer] Verifying registration OTP');
-  const response = await api.post('/dealer/register/verify-otp', dto, { skipAuth: true });
+  const email = dto?.email || '';
+  const otp = dto?.otp || '';
+  const url = `/dealer/register/verify-otp?email=${encodeURIComponent(email)}&otp=${encodeURIComponent(otp)}`;
+  const response = await api.post(url, dto, { skipAuth: true });
   return response.data;
 };
 
@@ -64,8 +67,10 @@ export const dealerSendMobileOtp = async (mobile) => {
 };
 
 export const dealerRegisterVerifyMobileOtp = async (dto) => {
-  // dto: { mobile, otp }
   console.log('[Dealer] Verifying mobile registration OTP');
-  const response = await api.post('/dealer/register/verify-mobile-otp', dto, { skipAuth: true });
+  const mobile = dto?.mobileNumber || dto?.mobile || '';
+  const otp = dto?.otp || '';
+  const url = `/dealer/register/verify-mobile-otp?mobileNumber=${encodeURIComponent(mobile)}&mobile=${encodeURIComponent(mobile)}&otp=${encodeURIComponent(otp)}`;
+  const response = await api.post(url, dto, { skipAuth: true });
   return response.data;
 };

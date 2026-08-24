@@ -335,10 +335,11 @@ const ResidentialInfoScreen = ({ navigation, route }) => {
       }
 
       const asset = result.assets?.[0];
-      if (asset) {
+      if (asset && asset.uri) {
+        const rawName = asset.fileName || `document_${Date.now()}.jpg`;
         setFile({
           uri: asset.uri,
-          name: sanitizeFileName(asset.fileName, 'document'),
+          name: sanitizeFileName(rawName, 'document'),
           type: asset.type || 'image/jpeg',
         });
       }

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, ScrollView,
   TouchableOpacity, ActivityIndicator,
@@ -8,7 +8,7 @@ import DocumentPicker from 'react-native-document-picker';
 import { launchCamera } from 'react-native-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../../services/api';
-import { downloadDocumentToStorage } from '../../services/documentService';
+import { downloadDocumentToStorage, clearDocumentCache } from '../../services/documentService';
 import DocumentPreviewModal from '../../components/common/DocumentPreviewModal';
 import Toast from 'react-native-toast-message';
 import { sanitizeFileName } from '../../services/fileUtils';
@@ -132,6 +132,7 @@ const LoanStatusScreen = ({ navigation, route }) => {
   const [user, setUser] = useState(null);
   const [documents, setDocuments] = useState([]);
   const [reuploading, setReuploading] = useState({});
+  const [reuploadedMap, setReuploadedMap] = useState({});
   const [previewDoc, setPreviewDoc] = useState(null); // { id, fileName }
   const [paymentStatus, setPaymentStatus] = useState(null);
 
@@ -148,7 +149,22 @@ const LoanStatusScreen = ({ navigation, route }) => {
       }
       if (docsRes.status === 'fulfilled') {
         const raw = docsRes.value?.data?.data || docsRes.value?.data || [];
-        setDocuments(Array.isArray(raw) ? raw : []);
+        let list = Array.isArray(raw) ? raw : [];
+        list = list.map(d => {
+          const did = String(d.id || d.documentId);
+          const reup = reuploadedMap[did];
+          if (reup) {
+            return {
+              ...d,
+              status: 'PENDING',
+              fileName: reup.fileName || d.fileName,
+              remarks: null,
+              rejectionReason: null,
+            };
+          }
+          return d;
+        });
+        setDocuments(list);
       }
     } finally {
       setLoading(false);
@@ -158,15 +174,24 @@ const LoanStatusScreen = ({ navigation, route }) => {
       const ps = await AsyncStorage.getItem(`customer_payment_status_${userId}`);
       setPaymentStatus(ps || null);
     } catch {
-      setPaymentStatus(null);
+      // ignore
     }
-  }, [userId]);
+  }, [userId, reuploadedMap]);
 
-  useFocusEffect(useCallback(() => { fetchData(); }, [fetchData]));
+  useEffect(() => {
+    if (userId) fetchData();
+  }, [userId, fetchData]);
 
-  // ── Re-upload ──────────────────────────────────────────────────────────────
-  const handleReupload = async (doc) => {
+  // ── Re-upload ───────────────────────────────────────────────────────────────
+  const handleReuploadPickFile = async (doc) => {
     const docId = doc.id || doc.documentId;
+    if (docId) {
+      try {
+        await clearDocumentCache(docId);
+      } catch (err) {
+        console.log('[CACHE] Clear doc cache error:', err.message);
+      }
+    }
     try {
       const result = await DocumentPicker.pickSingle({
         type: ALLOWED_TYPES,
@@ -174,30 +199,87 @@ const LoanStatusScreen = ({ navigation, route }) => {
       });
       const docType = doc.documentType || doc.type || 'document';
       const cleanName = sanitizeFileName(result.name, docType);
+      const uid = doc.userId || userId;
 
       const formData = new FormData();
+      const fileUri = result.fileCopyUri || result.uri;
       formData.append('file', {
-        uri: result.fileCopyUri || result.uri,
+        uri: Platform.OS === 'android' ? fileUri : fileUri.replace('file://', ''),
         name: cleanName,
         type: result.type || 'application/octet-stream',
       });
+      if (uid) {
+        formData.append('userId', String(uid));
+      }
+      formData.append('type', docType);
+      formData.append('documentType', docType);
+      formData.append('status', 'PENDING');
 
-      await api.put(`/documents/${docId}`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      let uploadSuccess = false;
+
+      // 1. Delete old document record from backend so image binary is replaced
+      if (docId) {
+        try {
+          await api.delete(`/documents/${docId}`);
+        } catch (delErr) {
+          console.log('[UPLOAD] Delete old doc notice:', delErr?.message);
+        }
+      }
+
+      // 2. Upload new file via POST /documents/upload
+      try {
+        await api.post('/documents/upload', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          timeout: 30000,
+        });
+        uploadSuccess = true;
+      } catch (postErr) {
+        // 3. Try PUT /documents/{docId} if delete wasn't supported
+        try {
+          await api.put(`/documents/${docId}`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+            timeout: 30000,
+          });
+          uploadSuccess = true;
+        } catch (putErr) {
+          const msg = (postErr?.response?.data?.message || putErr?.response?.data?.message || '').toLowerCase();
+          if (msg.includes('already uploaded')) {
+            uploadSuccess = true;
+          } else {
+            throw postErr || putErr;
+          }
+        }
+      }
+
+      if (!uploadSuccess) {
+        throw new Error('Upload failed');
+      }
+
+      // 2. Clear previous remarks and update status to PENDING
+      try {
+        await api.put(`/documents/${docId}/remarks`, { remarks: '' });
+      } catch {}
+      try {
+        await api.put(`/documents/status/${docId}?status=PENDING`);
+      } catch {}
+
+      setReuploadedMap(prev => ({
+        ...prev,
+        [String(docId)]: { fileName: cleanName, status: 'PENDING' },
+      }));
 
       setDocuments(prev =>
         prev.map(d =>
           (d.id || d.documentId) === docId
-            ? { ...d, status: 'PENDING', fileName: cleanName }
+            ? { ...d, status: 'PENDING', fileName: cleanName, remarks: null, rejectionReason: null }
             : d
         )
       );
-      Toast.show({ type: 'success', text1: 'Document re-uploaded successfully' });
+      Toast.show({ type: 'success', text1: 'Document uploaded successfully' });
       fetchData();
     } catch (err) {
       if (!DocumentPicker.isCancel(err)) {
-        Toast.show({ type: 'error', text1: err?.response?.data?.message || 'Re-upload failed' });
+        Toast.show({ type: 'error', text1: err?.response?.data?.message || err?.message || 'Upload failed' });
       }
     } finally {
       setReuploading(prev => ({ ...prev, [docId]: false }));
@@ -206,6 +288,14 @@ const LoanStatusScreen = ({ navigation, route }) => {
 
   const handleReuploadCamera = async (doc) => {
     const docId = doc.id || doc.documentId;
+    const uid = doc.userId || userId;
+    if (docId) {
+      try {
+        await clearDocumentCache(docId);
+      } catch (err) {
+        console.log('[CACHE] Clear doc cache error:', err.message);
+      }
+    }
     try {
       const result = await launchCamera({
         mediaType: 'photo',
@@ -228,35 +318,92 @@ const LoanStatusScreen = ({ navigation, route }) => {
       }
 
       const asset = result.assets?.[0];
-      if (!asset) return;
+      if (!asset || !asset.uri) return;
 
       const docType = doc.documentType || doc.type || 'document';
-      const cleanName = sanitizeFileName(asset.fileName, docType);
+      const rawName = asset.fileName || `${docType}_${Date.now()}.jpg`;
+      const cleanName = sanitizeFileName(rawName, docType);
 
       setReuploading(prev => ({ ...prev, [docId]: true }));
 
       const formData = new FormData();
+      const fileUri = Platform.OS === 'android' ? asset.uri : asset.uri.replace('file://', '');
       formData.append('file', {
-        uri: asset.uri,
+        uri: fileUri,
         name: cleanName,
         type: asset.type || 'image/jpeg',
       });
+      if (uid) {
+        formData.append('userId', String(uid));
+      }
+      formData.append('type', docType);
+      formData.append('documentType', docType);
+      formData.append('status', 'PENDING');
 
-      await api.put(`/documents/${docId}`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      let uploadSuccess = false;
+
+      // 1. Delete old document record from backend so image binary is replaced
+      if (docId) {
+        try {
+          await api.delete(`/documents/${docId}`);
+        } catch (delErr) {
+          console.log('[UPLOAD] Delete old doc notice:', delErr?.message);
+        }
+      }
+
+      // 2. Upload new file via POST /documents/upload
+      try {
+        await api.post('/documents/upload', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          timeout: 30000,
+        });
+        uploadSuccess = true;
+      } catch (postErr) {
+        // 3. Try PUT /documents/{docId} if delete wasn't supported
+        try {
+          await api.put(`/documents/${docId}`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+            timeout: 30000,
+          });
+          uploadSuccess = true;
+        } catch (putErr) {
+          const msg = (postErr?.response?.data?.message || putErr?.response?.data?.message || '').toLowerCase();
+          if (msg.includes('already uploaded')) {
+            uploadSuccess = true;
+          } else {
+            throw postErr || putErr;
+          }
+        }
+      }
+
+      if (!uploadSuccess) {
+        throw new Error('Upload failed');
+      }
+
+      // 2. Clear previous remarks and update status to PENDING
+      try {
+        await api.put(`/documents/${docId}/remarks`, { remarks: '' });
+      } catch {}
+      try {
+        await api.put(`/documents/status/${docId}?status=PENDING`);
+      } catch {}
+
+      setReuploadedMap(prev => ({
+        ...prev,
+        [String(docId)]: { fileName: cleanName, status: 'PENDING' },
+      }));
 
       setDocuments(prev =>
         prev.map(d =>
           (d.id || d.documentId) === docId
-            ? { ...d, status: 'PENDING', fileName: cleanName }
+            ? { ...d, status: 'PENDING', fileName: cleanName, remarks: null, rejectionReason: null }
             : d
         )
       );
-      Toast.show({ type: 'success', text1: 'Document re-uploaded successfully' });
+      Toast.show({ type: 'success', text1: 'Document uploaded successfully' });
       fetchData();
     } catch (err) {
-      Toast.show({ type: 'error', text1: err?.response?.data?.message || 'Re-upload failed' });
+      Toast.show({ type: 'error', text1: err?.response?.data?.message || err?.message || 'Upload failed' });
     } finally {
       setReuploading(prev => ({ ...prev, [docId]: false }));
     }
@@ -510,7 +657,7 @@ const LoanStatusScreen = ({ navigation, route }) => {
             <TouchableOpacity style={styles.downloadSmBtn} onPress={() => handleDocDownload(doc)}>
               <Text style={styles.downloadSmBtnText}>⬇</Text>
             </TouchableOpacity>
-            {isRejected && (
+            {isRejected ? (
               <View style={styles.reuploadActions}>
                 <TouchableOpacity
                   style={[styles.reuploadCameraBtn, uploading && { opacity: 0.6 }]}
@@ -521,7 +668,7 @@ const LoanStatusScreen = ({ navigation, route }) => {
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.reuploadBtn, uploading && { opacity: 0.6 }]}
-                  onPress={() => handleReupload(doc)}
+                  onPress={() => handleReuploadPickFile(doc)}
                   disabled={uploading}
                 >
                   {uploading
@@ -530,6 +677,17 @@ const LoanStatusScreen = ({ navigation, route }) => {
                   }
                 </TouchableOpacity>
               </View>
+            ) : (
+              <TouchableOpacity
+                style={[styles.reuploadBtn, { backgroundColor: '#F97316' }, uploading && { opacity: 0.6 }]}
+                onPress={() => handleReuploadPickFile(doc)}
+                disabled={uploading}
+              >
+                {uploading
+                  ? <ActivityIndicator size="small" color={COLORS.white} />
+                  : <Text style={styles.reuploadBtnText}>Replace</Text>
+                }
+              </TouchableOpacity>
             )}
           </View>
         </View>

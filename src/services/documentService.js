@@ -39,20 +39,37 @@ export const getDocumentDownloadUrl = (documentId) =>
   `${api.defaults.baseURL}/documents/download/${documentId}`;
 
 /**
+ * Clear any cached preview files for a documentId.
+ */
+export const clearDocumentCache = async (documentId) => {
+  try {
+    const files = await RNFS.readDir(RNFS.CachesDirectoryPath);
+    for (const f of files) {
+      if (f.name.startsWith(`${documentId}_`)) {
+        await RNFS.unlink(f.path).catch(() => {});
+      }
+    }
+  } catch (_) {}
+};
+
+/**
  * Download a document to the device cache directory (for preview).
  * Uses JWT auth header — solves the auth issue with Image/Linking.
  * Returns the local file:// path on success.
  */
-export const downloadDocumentToCache = async (documentId, fileName) => {
+export const downloadDocumentToCache = async (documentId, fileName, forceRefresh = false) => {
   const token = await AsyncStorage.getItem('token');
   const url = `${api.defaults.baseURL}/documents/preview/${documentId}`;
   const safeName = (fileName || `doc_${documentId}`).replace(/[^a-zA-Z0-9._-]/g, '_');
   const destPath = `${RNFS.CachesDirectoryPath}/${documentId}_${safeName}`;
 
-  // If already cached, return immediately
-  const exists = await RNFS.exists(destPath);
-  if (exists) {
-    return destPath;
+  if (forceRefresh) {
+    await RNFS.unlink(destPath).catch(() => {});
+  } else {
+    const exists = await RNFS.exists(destPath);
+    if (exists) {
+      return destPath;
+    }
   }
 
   const result = await RNFS.downloadFile({

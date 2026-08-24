@@ -53,7 +53,10 @@ export const userSendRegisterOtp = async (email) => {
 };
 
 export const userRegisterVerifyOtp = async (dto) => {
-  const response = await api.post('/user/register/verify-otp', dto, { skipAuth: true });
+  const email = dto?.email || '';
+  const otp = dto?.otp || '';
+  const url = `/user/register/verify-otp?email=${encodeURIComponent(email)}&otp=${encodeURIComponent(otp)}`;
+  const response = await api.post(url, dto, { skipAuth: true });
   return response.data;
 };
 
@@ -72,7 +75,9 @@ export const userSendMobileOtp = async (mobile) => {
 };
 
 export const userRegisterVerifyMobileOtp = async (dto) => {
-  // dto: { mobile, otp }
-  const response = await api.post('/user/register/verify-mobile-otp', dto, { skipAuth: true });
+  const mobile = dto?.mobileNumber || dto?.mobile || '';
+  const otp = dto?.otp || '';
+  const url = `/user/register/verify-mobile-otp?mobileNumber=${encodeURIComponent(mobile)}&mobile=${encodeURIComponent(mobile)}&otp=${encodeURIComponent(otp)}`;
+  const response = await api.post(url, dto, { skipAuth: true });
   return response.data;
 };
