@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import Video from 'react-native-video';
 import { COLORS, SPACING, RADIUS } from '../../constants/theme';
+import OfferBubble from '../../components/common/OfferBubble';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -320,8 +321,11 @@ const HomeScreen = ({ navigation }) => {
                   styles.heroBadge,
                   { transform: [{ translateY: floatAnim }] },
                 ]}>
+                <View style={styles.heroBadgeIconWrap}>
+                  <Text style={styles.heroBadgeStar}>★</Text>
+                </View>
                 <Text style={styles.heroBadgeText}>
-                  🚗 Vehicle Loan Specialists
+                  Driving Aspirations Forward
                 </Text>
               </Animated.View>
 
@@ -662,6 +666,9 @@ const HomeScreen = ({ navigation }) => {
           style={styles.whatsAppButtonIcon}
         />
       </TouchableOpacity>
+
+      {/* Floating Offer Bubble Component */}
+      <OfferBubble />
     </View>
   );
 };
@@ -746,20 +753,37 @@ const styles = StyleSheet.create({
   },
 
   heroBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
     alignSelf: 'flex-start',
-    backgroundColor: COLORS.accent + '30',
-    borderRadius: RADIUS.xl,
+    backgroundColor: 'rgba(30, 207, 195, 0.18)',
+    borderRadius: 20,
     paddingHorizontal: 14,
-    paddingVertical: 6,
+    paddingVertical: 7,
     marginBottom: SPACING.md,
-    borderWidth: 1,
-    borderColor: COLORS.accent + '60',
+    borderWidth: 1.5,
+    borderColor: 'rgba(30, 207, 195, 0.45)',
+    shadowColor: '#1ECFC3',
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+  },
+
+  heroBadgeIconWrap: {
+    marginRight: 6,
+  },
+
+  heroBadgeStar: {
+    color: '#1ECFC3',
+    fontSize: 12,
   },
 
   heroBadgeText: {
-    color: COLORS.accent,
-    fontSize: 12,
+    color: '#1ECFC3',
+    fontSize: 13,
     fontWeight: '800',
+    letterSpacing: 0.3,
   },
 
   heroTitle: {

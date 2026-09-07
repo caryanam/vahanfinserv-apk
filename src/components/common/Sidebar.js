@@ -24,7 +24,7 @@ const Sidebar = ({
   role = 'USER',
 }) => {
   const roleLabel = role === 'ADMIN' ? 'Admin' : role === 'DEALER' ? 'Dealer' : 'Customer';
-  const roleColor = '#24D1C2';
+  const roleColor = role === 'ADMIN' ? '#F59E0B' : role === 'DEALER' ? '#24D1C2' : '#60A5FA';
 
   return (
     <Modal
@@ -34,8 +34,6 @@ const Sidebar = ({
       onRequestClose={onClose}
     >
       <View style={styles.overlay}>
-        <Pressable style={styles.backdrop} onPress={onClose} />
-
         <SafeAreaView style={styles.drawer}>
           <StatusBar barStyle="light-content" backgroundColor="#071F38" />
 
@@ -58,18 +56,23 @@ const Sidebar = ({
             {menuItems.map((item) => {
               const isActive = activeMenu === item.name;
 
-              // Color mapping for icons
+              // Color mapping for icons matching Dealer & Customer UI themes
               const getIconColor = (name) => {
                 if (isActive) return '#FFFFFF';
                 switch (name) {
                   case 'Dashboard': return '#24D1C2';
-                  case 'Users': return '#60A5FA';
+                  case 'Users':
+                  case 'Customers': return '#60A5FA';
+                  case 'Add Customer': return '#34D399';
+                  case 'Applications': return '#60A5FA';
                   case 'Dealers': return '#F59E0B';
                   case 'Documents': return '#34D399';
                   case 'Payments': return '#A78BFA';
                   case 'Banks': return '#38BDF8';
                   case 'Reports': return '#F87171';
+                  case 'Profile': return '#F59E0B';
                   case 'Settings': return '#9CA3AF';
+                  case 'Legal': return '#A78BFA';
                   default: return '#24D1C2';
                 }
               };
@@ -106,6 +109,8 @@ const Sidebar = ({
             </TouchableOpacity>
           </View>
         </SafeAreaView>
+
+        <Pressable style={styles.backdrop} onPress={onClose} />
       </View>
     </Modal>
   );

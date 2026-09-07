@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../../services/api';
 import {downloadDocumentToStorage} from '../../services/documentService';
 import DocumentPreviewModal from '../../components/common/DocumentPreviewModal';
@@ -99,17 +100,55 @@ const VerifySubmitScreen = ({navigation, route}) => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [userRes, docsRes] = await Promise.allSettled([
-        api.get(`/user/${userId}`),
-        api.get(`/documents/user/${userId}`),
+      let localUser = null;
+      try {
+        const raw = await AsyncStorage.getItem('userData');
+        if (raw) localUser = JSON.parse(raw);
+      } catch {}
+
+      const targetId = userId || localUser?.id || localUser?.userId;
+
+      const [userRes, personalRes, docsRes] = await Promise.allSettled([
+        targetId ? api.get(`/user/${targetId}`) : Promise.reject(),
+        targetId ? api.get(`/personal-info/${targetId}`).catch(() => api.get(`/personal-info/user/${targetId}`)) : Promise.reject(),
+        targetId ? api.get(`/documents/user/${targetId}`) : Promise.reject(),
       ]);
+
+      let userDataObj = {};
       if (userRes.status === 'fulfilled') {
-        setUser(userRes.value?.data?.data || userRes.value?.data || null);
+        const val = userRes.value?.data?.data || userRes.value?.data || {};
+        userDataObj = typeof val === 'object' ? val : {};
       }
+
+      let personalObj = {};
+      if (personalRes.status === 'fulfilled') {
+        const val = personalRes.value?.data?.data || personalRes.value?.data || {};
+        personalObj = typeof val === 'object' ? val : {};
+      }
+
+      const mergedUser = {
+        ...(localUser || {}),
+        ...userDataObj,
+        ...personalObj,
+        fullName: userDataObj.fullName || userDataObj.name || personalObj.fullName || localUser?.fullName || localUser?.name || '',
+        email: userDataObj.email || personalObj.email || localUser?.email || '',
+        mobileNumber: userDataObj.mobileNumber || userDataObj.phone || personalObj.mobileNumber || localUser?.mobileNumber || '',
+        role: userDataObj.role || localUser?.role || 'CUSTOMER',
+        address: personalObj.address || userDataObj.address || localUser?.address || '',
+        city: personalObj.city || userDataObj.city || localUser?.city || '',
+        state: personalObj.state || userDataObj.state || localUser?.state || '',
+        pincode: personalObj.pincode || userDataObj.pincode || localUser?.pincode || '',
+        loanAmount: personalObj.loanAmount || userDataObj.loanAmount || localUser?.loanAmount || '',
+      };
+
+      setUser(mergedUser);
+
       if (docsRes.status === 'fulfilled') {
         const raw = docsRes.value?.data?.data || docsRes.value?.data || [];
         setDocuments(Array.isArray(raw) ? raw : []);
       }
+    } catch (err) {
+      console.log('[VerifySubmit] Fetch data error:', err);
     } finally {
       setLoading(false);
     }
@@ -143,7 +182,8 @@ const VerifySubmitScreen = ({navigation, route}) => {
   const submitApplication = async () => {
     setSubmitting(true);
     try {
-      const response = await api.get(`/user/${userId}`);
+      const targetId = userId || user?.id || user?.userId;
+      const response = await api.get(`/user/${targetId}`);
       const profile = response.data?.data || response.data || {};
       const regType = String(profile?.registrationType || '')
         .toUpperCase()
@@ -173,11 +213,10 @@ const VerifySubmitScreen = ({navigation, route}) => {
       } else {
         // Individual users must pay before application is submitted to the admin
         Toast.show({type: 'success', text1: 'Application verified'});
-        navigation.navigate('Payment', {applicationNumber, userId});
+        navigation.navigate('Payment', {applicationNumber, userId: targetId});
       }
     } catch (err) {
       console.log('VERIFY SUBMIT SCREEN PROFILE FETCH ERROR =>', err);
-      // Fallback
       navigation.navigate('Payment', {applicationNumber, userId});
     } finally {
       setSubmitting(false);
@@ -189,13 +228,14 @@ const VerifySubmitScreen = ({navigation, route}) => {
     return acc;
   }, {});
 
-  const InfoRow = ({label, value}) =>
-    value ? (
-      <View style={styles.infoRow}>
-        <Text style={styles.infoLabel}>{label}</Text>
-        <Text style={styles.infoValue}>{value}</Text>
-      </View>
-    ) : null;
+  const InfoRow = ({label, value}) => (
+    <View style={styles.infoRow}>
+      <Text style={styles.infoLabel}>{label}</Text>
+      <Text style={[styles.infoValue, !value && { color: '#9CA3AF', fontStyle: 'italic' }]}>
+        {value || 'Not provided'}
+      </Text>
+    </View>
+  );
 
   const DocCard = ({label, doc}) => (
     <View style={styles.docCard}>

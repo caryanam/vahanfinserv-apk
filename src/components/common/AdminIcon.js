@@ -100,8 +100,20 @@ const AdminIcon = ({ name, size = 20, color = '#10233F', style }) => {
         </View>
       );
 
+    case 'Profile':
+    case 'profile':
+    case 'User':
+    case 'user':
+      return (
+        <View style={[styles.center, iconSizeStyle, style]}>
+          <Text style={{ fontSize: size * 0.82, color, lineHeight: size }}>👤</Text>
+        </View>
+      );
+
     case 'Shield':
     case 'shield':
+    case 'Legal':
+    case 'legal':
       return (
         <View style={[styles.center, iconSizeStyle, style]}>
           <Text style={{ fontSize: size * 0.82, color, lineHeight: size }}>🛡️</Text>

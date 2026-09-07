@@ -16,31 +16,6 @@ import api from '../services/api';
 import { COLORS } from '../constants/theme';
 import Toast from 'react-native-toast-message';
 
-const getMockNotifications = (role) => {
-  if (role === 'ADMIN') {
-    return [
-      { id: '1', message: 'New dealer registration request from Mohan Motors', createdAt: new Date(Date.now() - 600000).toISOString(), isRead: false },
-      { id: '2', message: 'Payment verification request from customer Rahul', createdAt: new Date(Date.now() - 3600000).toISOString(), isRead: false },
-      { id: '3', message: 'Document review pending for customer Yash', createdAt: new Date(Date.now() - 7200000).toISOString(), isRead: true },
-      { id: '4', message: 'Bank assignment updated for dealer DLR-38D7DD', createdAt: new Date(Date.now() - 86400000).toISOString(), isRead: true },
-    ];
-  } else if (role === 'DEALER') {
-    return [
-      { id: '1', message: "Customer Yash's Aadhaar Card has been approved", createdAt: new Date(Date.now() - 300000).toISOString(), isRead: false },
-      { id: '2', message: 'Document rejection alert for customer Karan - Odometer Reading invalid', createdAt: new Date(Date.now() - 1800000).toISOString(), isRead: false },
-      { id: '3', message: 'Customer Om has completed registration successfully', createdAt: new Date(Date.now() - 7200000).toISOString(), isRead: true },
-      { id: '4', message: 'New lead assigned from admin - Rahul (Individual)', createdAt: new Date(Date.now() - 86400000).toISOString(), isRead: true },
-    ];
-  } else {
-    return [
-      { id: '1', message: 'Your PAN Card has been verified successfully ✓', createdAt: new Date(Date.now() - 3600000).toISOString(), isRead: false },
-      { id: '2', message: 'Please pay the Ready2Drive package fee to begin verification', createdAt: new Date(Date.now() - 10800000).toISOString(), isRead: false },
-      { id: '3', message: 'Your personal information section has been approved by admin', createdAt: new Date(Date.now() - 21600000).toISOString(), isRead: true },
-      { id: '4', message: 'Welcome to Vahan Finserv! Please complete your KYC details', createdAt: new Date(Date.now() - 172800000).toISOString(), isRead: true },
-    ];
-  }
-};
-
 const formatTimeAgo = (dateString) => {
   if (!dateString) return 'Just now';
   try {
@@ -79,47 +54,75 @@ const NotificationScreen = ({ navigation }) => {
       let uId = null;
       if (uRole === 'ADMIN') {
         const data = await AsyncStorage.getItem('adminData');
-        if (data) uId = JSON.parse(data)?.id || JSON.parse(data)?.userId;
+        if (data) {
+          const parsed = JSON.parse(data);
+          uId = parsed?.id || parsed?.userId || parsed?.adminId;
+        }
       } else if (uRole === 'DEALER') {
         const data = await AsyncStorage.getItem('dealerData');
-        if (data) uId = JSON.parse(data)?.id || JSON.parse(data)?.userId;
+        if (data) {
+          const parsed = JSON.parse(data);
+          uId = parsed?.id || parsed?.userId || parsed?.dealerId;
+        }
       } else {
         const data = await AsyncStorage.getItem('userData');
-        if (data) uId = JSON.parse(data)?.id || JSON.parse(data)?.userId;
+        if (data) {
+          const parsed = JSON.parse(data);
+          uId = parsed?.id || parsed?.userId;
+        }
       }
       setUserId(uId);
 
       if (uId) {
-        const res = await api.get(`/notifications/${uId}`);
         let list = [];
-        if (res?.data) {
-          const rawList = Array.isArray(res.data) ? res.data : Array.isArray(res.data?.data) ? res.data.data : [];
-          list = rawList;
+        try {
+          const res = await api.get(`/notifications/${uId}`);
+          const raw = res?.data;
+          const dataArray = raw?.data ?? raw;
+          if (Array.isArray(dataArray)) {
+            list = dataArray;
+          }
+        } catch (apiErr) {
+          console.log('[Notifications] Error fetching notifications from API:', apiErr?.message);
         }
-        
-        // Merge with mock notifications so it has initial state
-        const mocks = getMockNotifications(uRole);
-        const combined = [...list];
-        // Ensure mock ids don't collide
-        mocks.forEach(mock => {
-          if (!combined.some(item => item.message === mock.message)) {
-            combined.push(mock);
+
+        // Merge local notifications saved in AsyncStorage (matching Web Frontend finserv-main)
+        let localNotifs = [];
+        try {
+          const rawDealerNotifs = await AsyncStorage.getItem('dealer_assignment_notifications');
+          const rawAdminNotifs = await AsyncStorage.getItem('admin_activity_notifications');
+          const dNotifs = rawDealerNotifs ? JSON.parse(rawDealerNotifs) : [];
+          const aNotifs = rawAdminNotifs ? JSON.parse(rawAdminNotifs) : [];
+          localNotifs = [...dNotifs, ...aNotifs];
+        } catch (localErr) {
+          localNotifs = [];
+        }
+
+        // Filter and deduplicate notifications
+        const notifMap = new Map();
+        [...localNotifs, ...list].forEach((n) => {
+          const nRole = n.receiverRole || n.role;
+          if (nRole && nRole.toUpperCase() !== uRole) return;
+          const key = String(n.id || n.notificationId || n.createdAt || n.message);
+          if (key && !notifMap.has(key)) {
+            notifMap.set(key, n);
           }
         });
 
-        combined.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-        setNotifications(combined);
+        const mergedList = Array.from(notifMap.values());
+        mergedList.sort((a, b) => new Date(b.createdAt || b.date || 0).getTime() - new Date(a.createdAt || a.date || 0).getTime());
+        setNotifications(mergedList);
       } else {
-        setNotifications(getMockNotifications(uRole));
+        setNotifications([]);
       }
     } catch (err) {
       console.log('Error loading notifications:', err.message);
-      setNotifications(getMockNotifications(role));
+      setNotifications([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [role]);
+  }, []);
 
   useEffect(() => {
     loadUserAndFetch();

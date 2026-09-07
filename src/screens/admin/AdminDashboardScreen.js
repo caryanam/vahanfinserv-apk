@@ -113,7 +113,16 @@ const AdminDashboardScreen = ({ navigation }) => {
       const applications = safe(results[4]);
       const banks = safe(results[5]);
       const notifs = safe(results[6]);
-      const unread = notifs.filter((n) => !n.read && !n.isRead).length;
+      const validUnreadNotifs = notifs.filter((n) => {
+        const isUnread = !n.read && !n.isRead;
+        const msgText = String(n.message || n.title || '').trim();
+        const hasMessage = Boolean(msgText);
+        const msgLower = msgText.toLowerCase();
+        const isSystemLog = msgLower.startsWith('payment_status:') || msgLower.includes('internal_log');
+        const roleMatch = !n.receiverRole && !n.role ? true : String(n.receiverRole || n.role).toUpperCase() === 'ADMIN';
+        return isUnread && hasMessage && !isSystemLog && roleMatch;
+      });
+      const unread = validUnreadNotifs.length;
 
       let pendingPayments = 0;
       try {
@@ -200,10 +209,12 @@ const AdminDashboardScreen = ({ navigation }) => {
             onPress={() => navigation.navigate('Notification')}
             activeOpacity={0.7}
           >
-            <AdminIcon name="Bell" size={18} color="#F59E0B" />
+            <AdminIcon name="Bell" size={22} color="#F59E0B" />
             {stats.notifications > 0 && (
               <View style={styles.badgeWrap}>
-                <Text style={styles.badgeText}>{stats.notifications}</Text>
+                <Text style={styles.badgeText}>
+                  {stats.notifications > 99 ? '99+' : stats.notifications}
+                </Text>
               </View>
             )}
           </TouchableOpacity>
@@ -388,20 +399,25 @@ const styles = StyleSheet.create({
   },
   badgeWrap: {
     position: 'absolute',
-    top: 4,
-    right: 4,
+    top: -3,
+    right: -3,
     backgroundColor: '#EF4444',
-    borderRadius: 8,
-    minWidth: 16,
-    height: 16,
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 3,
+    paddingHorizontal: 4,
+    borderWidth: 1.5,
+    borderColor: '#0B2A4A',
+    zIndex: 10,
+    elevation: 4,
   },
   badgeText: {
     color: '#FFFFFF',
     fontSize: 10,
-    fontWeight: '800',
+    fontWeight: '900',
+    textAlign: 'center',
   },
   avatarCircle: {
     width: 40,

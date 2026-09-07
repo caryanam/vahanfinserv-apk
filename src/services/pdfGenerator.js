@@ -1,6 +1,6 @@
 import {Platform, PermissionsAndroid} from 'react-native';
 import {decode, encode} from 'base-64';
-import RNFS from 'react-native-fs';
+import RNFS from '@dr.pogodin/react-native-fs';
 
 const setupPolyfills = () => {
   if (typeof global !== 'undefined') {

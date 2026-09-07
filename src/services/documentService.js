@@ -1,6 +1,6 @@
 // src/services/documentService.js
 import api from './api';
-import RNFS from 'react-native-fs';
+import RNFS from '@dr.pogodin/react-native-fs';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export const uploadDocument = (formData) =>

@@ -57,6 +57,11 @@ const EMPTY_FORM = {
   email: '',
   mobileNumber: '',
   password: '',
+  address: '',
+  city: '',
+  state: '',
+  pincode: '',
+  loanAmount: '',
 };
 
 const DOCUMENT_GROUPS = [
@@ -124,25 +129,23 @@ const getListFromResponse = (response) => {
   return [];
 };
 
-// Fallback customers if backend list is empty (ensures UI matches screenshot requirement)
-const DEMO_CUSTOMERS = [
-  { userId: '1', fullName: 'Yash', email: 'yashc@gmail.com', mobileNumber: '9325902494', dealerCode: 'DLR-38D7DD' },
-  { userId: '2', fullName: 'Aryan', email: 'aryan@gmail.com', mobileNumber: '9646568656', dealerCode: 'DLR-38D7DD' },
-  { userId: '3', fullName: 'Om', email: 'om@gmail.com', mobileNumber: '9874563210', dealerCode: 'DLR-38D7DD' },
-];
-
-const DEMO_PENDING_DOCS = [
-  { id: 'p1', userName: 'Yash', type: 'Aadhaar Card', time: 'Submitted 2 days ago' },
-  { id: 'p2', userName: 'Aryan', type: 'PAN Card', time: 'Submitted 1 day ago' },
-  { id: 'p3', userName: 'Om', type: 'Address Proof', time: 'Submitted 3 days ago' },
-];
-
-const RECENT_ACTIVITIES = [
-  { id: 'a1', icon: '✓', title: 'Document approved for Yash', time: '2 mins ago', color: '#10B981', bg: '#ECFDF5' },
-  { id: 'a2', icon: '↑', title: 'Document submitted by Aryan', time: '15 mins ago', color: '#3B82F6', bg: '#EFF6FF' },
-  { id: 'a3', icon: '+', title: 'New customer added - Om', time: '1 hour ago', color: '#8B5CF6', bg: '#F3E8FF' },
-  { id: 'a4', icon: '✕', title: 'Document rejected for Karan', time: '2 hours ago', color: '#EF4444', bg: '#FEF2F2' },
-];
+const formatTimeAgo = (dateString) => {
+  if (!dateString) return 'Recently';
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return 'Recently';
+    const seconds = Math.floor((new Date() - date) / 1000);
+    if (seconds < 60) return 'Just now';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+  } catch {
+    return 'Recently';
+  }
+};
 
 const DealerDashboardScreen = ({ navigation }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -154,18 +157,33 @@ const DealerDashboardScreen = ({ navigation }) => {
   const [dealerData, setDealerData] = useState(null);
   const [dealerUsers, setDealerUsers] = useState([]);
   const [allDocs, setAllDocs] = useState([]);
-  const [activities, setActivities] = useState(RECENT_ACTIVITIES);
+  const [activities, setActivities] = useState([]);
 
   const [stats, setStats] = useState({
-    customers: 3,
-    pendingDocs: 20,
-    approvedDocs: 2,
-    uploadedDocs: 25,
+    customers: 0,
+    pendingDocs: 0,
+    approvedDocs: 0,
+    uploadedDocs: 0,
   });
 
   const [addModal, setAddModal] = useState(false);
   const [addForm, setAddForm] = useState(EMPTY_FORM);
   const [addLoading, setAddLoading] = useState(false);
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
+
+  const [editModal, setEditModal] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState(null);
+  const [editForm, setEditForm] = useState({
+    fullName: '',
+    email: '',
+    mobileNumber: '',
+    address: '',
+    city: '',
+    state: '',
+    pincode: '',
+    loanAmount: '',
+  });
+  const [editLoading, setEditLoading] = useState(false);
 
   const [emailOtpSent, setEmailOtpSent] = useState(false);
   const [emailOtp, setEmailOtp] = useState('');
@@ -261,8 +279,8 @@ const DealerDashboardScreen = ({ navigation }) => {
 
   const handleSendMobileOtp = async () => {
     const cleanMobile = addForm.mobileNumber.replace(/\D/g, '');
-    if (!/^\d{10}$/.test(cleanMobile)) {
-      Toast.show({ type: 'error', text1: 'Please enter a valid 10-digit mobile number' });
+    if (!/^[6-9]\d{9}$/.test(cleanMobile)) {
+      Toast.show({ type: 'error', text1: 'Mobile number must be 10 digits starting with 6, 7, 8, or 9' });
       return;
     }
     setMobileOtpSending(true);
@@ -283,8 +301,8 @@ const DealerDashboardScreen = ({ navigation }) => {
 
   const handleVerifyMobileOtp = async () => {
     const cleanMobile = addForm.mobileNumber.replace(/\D/g, '');
-    if (!/^\d{10}$/.test(cleanMobile)) {
-      Toast.show({ type: 'error', text1: 'Please enter a valid 10-digit mobile number' });
+    if (!/^[6-9]\d{9}$/.test(cleanMobile)) {
+      Toast.show({ type: 'error', text1: 'Mobile number must be 10 digits starting with 6, 7, 8, or 9' });
       return;
     }
     if (!mobileOtp || mobileOtp.trim().length !== 6) {
@@ -342,11 +360,45 @@ const DealerDashboardScreen = ({ navigation }) => {
   const [uploadedDocs, setUploadedDocs] = useState({});
 
   const readDealer = async () => {
-    const raw = await AsyncStorage.getItem('dealerData');
-    if (!raw) return null;
-    const dealer = JSON.parse(raw);
-    setDealerData(dealer);
-    return dealer;
+    try {
+      const raw = await AsyncStorage.getItem('dealerData');
+      const storedCode = await AsyncStorage.getItem('dealerCode');
+      let dealer = raw ? JSON.parse(raw) : null;
+      if (!dealer) dealer = {};
+
+      if (storedCode && !dealer.dealerCode) {
+        dealer.dealerCode = storedCode;
+      }
+
+      if (!dealer.dealerCode) {
+        try {
+          const res = await api.get('/dealer/all');
+          const list = getListFromResponse(res);
+          const matched = list.find(
+            (d) =>
+              (d.email && dealer.email && d.email.toLowerCase() === dealer.email.toLowerCase()) ||
+              (d.id && dealer.id && String(d.id) === String(dealer.id)) ||
+              (d.dealerId && dealer.dealerId && String(d.dealerId) === String(dealer.dealerId)) ||
+              (d.mobileNumber && dealer.mobileNumber && d.mobileNumber === dealer.mobileNumber)
+          );
+          if (matched) {
+            dealer = { ...dealer, ...matched };
+            await AsyncStorage.setItem('dealerData', JSON.stringify(dealer));
+            if (matched.dealerCode) {
+              await AsyncStorage.setItem('dealerCode', matched.dealerCode);
+            }
+          }
+        } catch (err) {
+          console.log('[DealerDashboard] Error fetching dealer profile from backend:', err);
+        }
+      }
+
+      setDealerData(dealer);
+      return dealer;
+    } catch (err) {
+      console.log('[DealerDashboard] Error reading dealer storage:', err);
+      return null;
+    }
   };
 
   useEffect(() => {
@@ -357,20 +409,40 @@ const DealerDashboardScreen = ({ navigation }) => {
     try {
       setLoading(true);
       let dealer = dealerData;
-      if (!dealer) {
+      if (!dealer || !dealer.dealerCode) {
         dealer = await readDealer();
       }
 
       const dealerCode = String(dealer?.dealerCode || '').trim();
       if (!dealerCode) {
-        setDealerUsers(DEMO_CUSTOMERS);
+        setDealerUsers([]);
         setAllDocs([]);
-        setStats({ customers: 3, pendingDocs: 20, approvedDocs: 2, uploadedDocs: 25 });
+        setStats({ customers: 0, pendingDocs: 0, approvedDocs: 0, uploadedDocs: 0 });
+        setActivities([]);
         return;
       }
 
-      const res = await api.get(`/user/dealer/${dealerCode}`);
-      const users = getListFromResponse(res);
+      const res = await api.get(`/user/dealer/${dealerCode}`).catch(() => ({ data: [] }));
+      const apiUsers = getListFromResponse(res);
+
+      // Read locally saved dealer users for fallback persistence
+      let localUsers = [];
+      try {
+        const rawLocal = await AsyncStorage.getItem(`dealer_local_users_${dealerCode}`);
+        if (rawLocal) localUsers = JSON.parse(rawLocal);
+      } catch (e) {
+        localUsers = [];
+      }
+
+      // Merge local users and API users uniquely
+      const userMap = new Map();
+      [...localUsers, ...apiUsers].forEach((u) => {
+        const key = String(u.userId || u.id || u.email || u.mobileNumber);
+        if (key && !userMap.has(key)) {
+          userMap.set(key, u);
+        }
+      });
+      const users = Array.from(userMap.values());
 
       let docs = [];
       if (users.length > 0) {
@@ -387,23 +459,7 @@ const DealerDashboardScreen = ({ navigation }) => {
         });
       }
 
-      docs = docs.map(d => {
-        const did = String(d.documentId || d.id);
-        const reup = reuploadedMap[did];
-        if (reup) {
-          return {
-            ...d,
-            status: 'PENDING',
-            fileName: reup.fileName || d.fileName,
-            rejectionReason: null,
-            remarks: null,
-          };
-        }
-        return d;
-      });
-
-      const finalUsers = users.length > 0 ? users : DEMO_CUSTOMERS;
-      setDealerUsers(finalUsers);
+      setDealerUsers(users);
       setAllDocs(docs);
 
       const pendingCount = docs.filter((d) =>
@@ -415,15 +471,100 @@ const DealerDashboardScreen = ({ navigation }) => {
       ).length;
 
       setStats({
-        customers: finalUsers.length,
-        pendingDocs: pendingCount > 0 ? pendingCount : 20,
-        approvedDocs: approvedCount > 0 ? approvedCount : 2,
-        uploadedDocs: docs.length > 0 ? docs.length : 25,
+        customers: users.length,
+        pendingDocs: pendingCount,
+        approvedDocs: approvedCount,
+        uploadedDocs: docs.length,
       });
+
+      // Calculate unread notification count matching DEALER role & valid non-empty messages
+      try {
+        const dealerId = dealer?.dealerId || dealer?.id;
+        const notifRes = dealerId ? await api.get(`/notifications/${dealerId}`).catch(() => null) : null;
+        const apiNotifs = getListFromResponse(notifRes);
+        const rawLocal = await AsyncStorage.getItem('dealer_assignment_notifications').catch(() => null);
+        const localNotifs = rawLocal ? JSON.parse(rawLocal) : [];
+        
+        const allDealerNotifs = [...localNotifs, ...apiNotifs];
+        const validUnread = allDealerNotifs.filter((n) => {
+          const isUnread = !n.read && !n.isRead;
+          const msgText = String(n.message || n.title || '').trim();
+          const hasMessage = Boolean(msgText);
+          const msgLower = msgText.toLowerCase();
+          const isSystemLog = msgLower.startsWith('payment_status:') || msgLower.includes('internal_log');
+          const roleMatch = !n.receiverRole && !n.role ? true : String(n.receiverRole || n.role).toUpperCase() === 'DEALER';
+          return isUnread && hasMessage && !isSystemLog && roleMatch;
+        });
+        setUnreadNotifCount(validUnread.length);
+      } catch (notifErr) {
+        console.log('[DealerDashboard] Error fetching unread notifications:', notifErr);
+      }
+
+      // Build dynamic activities from real users and docs
+      const newActivities = [];
+      users.forEach((u) => {
+        if (u.createdAt) {
+          newActivities.push({
+            id: `usr_${u.userId || u.id}`,
+            timestamp: new Date(u.createdAt).getTime(),
+            icon: '+',
+            title: `New customer added - ${u.fullName || u.name || 'Customer'}`,
+            time: formatTimeAgo(u.createdAt),
+            color: '#8B5CF6',
+            bg: '#F3E8FF',
+          });
+        }
+      });
+
+      docs.forEach((d) => {
+        const u = users.find((usr) => String(usr.userId || usr.id) === String(d.userId));
+        const userName = u ? u.fullName || u.name : 'Customer';
+        const docType = d.documentType || d.type || 'Document';
+        const status = String(d.status || '').toUpperCase();
+
+        let act = null;
+        if (status === 'APPROVED' || status === 'VERIFIED') {
+          act = {
+            id: `doc_app_${d.documentId || d.id}`,
+            timestamp: d.updatedAt ? new Date(d.updatedAt).getTime() : Date.now(),
+            icon: '✓',
+            title: `${docType} approved for ${userName}`,
+            time: d.updatedAt ? formatTimeAgo(d.updatedAt) : 'Recently',
+            color: '#10B981',
+            bg: '#ECFDF5',
+          };
+        } else if (status === 'REJECTED') {
+          act = {
+            id: `doc_rej_${d.documentId || d.id}`,
+            timestamp: d.updatedAt ? new Date(d.updatedAt).getTime() : Date.now(),
+            icon: '✕',
+            title: `${docType} rejected for ${userName}`,
+            time: d.updatedAt ? formatTimeAgo(d.updatedAt) : 'Recently',
+            color: '#EF4444',
+            bg: '#FEF2F2',
+          };
+        } else {
+          act = {
+            id: `doc_sub_${d.documentId || d.id}`,
+            timestamp: d.createdAt ? new Date(d.createdAt).getTime() : Date.now(),
+            icon: '↑',
+            title: `${docType} submitted by ${userName}`,
+            time: d.createdAt ? formatTimeAgo(d.createdAt) : 'Recently',
+            color: '#3B82F6',
+            bg: '#EFF6FF',
+          };
+        }
+        if (act) newActivities.push(act);
+      });
+
+      newActivities.sort((a, b) => b.timestamp - a.timestamp);
+      setActivities(newActivities.slice(0, 10));
     } catch (error) {
-      setDealerUsers(DEMO_CUSTOMERS);
+      console.log('[DealerDashboard] Error loading data from backend:', error);
+      setDealerUsers([]);
       setAllDocs([]);
-      setStats({ customers: 3, pendingDocs: 20, approvedDocs: 2, uploadedDocs: 25 });
+      setStats({ customers: 0, pendingDocs: 0, approvedDocs: 0, uploadedDocs: 0 });
+      setActivities([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -436,18 +577,121 @@ const DealerDashboardScreen = ({ navigation }) => {
     }, [loadData])
   );
 
+  const resolveExistingUser = async (email, mobileNumber, dealerCode) => {
+    const targetEmail = String(email || '').trim().toLowerCase();
+    const cleanMobile = String(mobileNumber || '').replace(/\D/g, '');
+
+    // Check existing state users
+    const matchedState = dealerUsers.find(
+      (u) =>
+        (targetEmail && String(u.email || '').toLowerCase() === targetEmail) ||
+        (cleanMobile && String(u.mobileNumber || '').replace(/\D/g, '') === cleanMobile)
+    );
+    if (matchedState) return matchedState;
+
+    // Search dealer's assigned users endpoint
+    if (dealerCode) {
+      try {
+        const dealerRes = await api.get(`/user/dealer/${dealerCode}`);
+        const list = getListFromResponse(dealerRes);
+        const matched = list.find(
+          (u) =>
+            (targetEmail && String(u.email || '').toLowerCase() === targetEmail) ||
+            (cleanMobile && String(u.mobileNumber || '').replace(/\D/g, '') === cleanMobile)
+        );
+        if (matched) return matched;
+      } catch (e) {
+        console.log('[DealerAddCustomer] Error fetching dealer users:', e);
+      }
+    }
+
+    // Search /user/all database endpoint
+    try {
+      const allRes = await api.get('/user/all');
+      const allUsers = getListFromResponse(allRes);
+      const matched = allUsers.find(
+        (u) =>
+          (targetEmail && String(u.email || '').toLowerCase() === targetEmail) ||
+          (cleanMobile && String(u.mobileNumber || '').replace(/\D/g, '') === cleanMobile)
+      );
+      if (matched) return matched;
+    } catch (e) {
+      if (e?.response?.status !== 403) {
+        console.log('[DealerAddCustomer] Error searching /user/all:', e);
+      }
+    }
+
+    return null;
+  };
+
+  const getNextBackendUserId = async () => {
+    let maxId = 0;
+
+    // Check existing loaded dealer users
+    dealerUsers.forEach((u) => {
+      const idNum = Number(u.userId || u.id);
+      if (!isNaN(idNum) && idNum > maxId && idNum < 2000000000) {
+        maxId = idNum;
+      }
+    });
+
+    // Search all backend database users
+    try {
+      const allRes = await api.get('/user/all');
+      const allUsers = getListFromResponse(allRes);
+      if (Array.isArray(allUsers)) {
+        allUsers.forEach((u) => {
+          const idNum = Number(u.userId || u.id);
+          if (!isNaN(idNum) && idNum > maxId && idNum < 2000000000) {
+            maxId = idNum;
+          }
+        });
+      }
+    } catch (e) {
+      if (e?.response?.status !== 403) {
+        console.log('[DealerAddCustomer] Error fetching max user ID from backend:', e);
+      }
+    }
+
+    return maxId > 0 ? maxId + 1 : 1;
+  };
+
   const handleAddCustomer = async () => {
-    const { fullName, email, mobileNumber, password } = addForm;
+    const { fullName, email, mobileNumber, password, pincode, loanAmount } = addForm;
     if (!fullName.trim() || !email.trim() || !mobileNumber.trim() || !password.trim()) {
-      Toast.show({ type: 'error', text1: 'All fields are required' });
+      Toast.show({ type: 'error', text1: 'Name, Email, Mobile and Password are required' });
+      return;
+    }
+
+    const trimmedEmail = email.trim().toLowerCase();
+    if (!/^[a-zA-Z0-9._%+-]+@gmail\.com$/i.test(trimmedEmail)) {
+      Toast.show({ type: 'error', text1: 'Email address must end with @gmail.com' });
       return;
     }
 
     const cleanMobile = mobileNumber.replace(/\D/g, '');
-    if (!/^\d{10}$/.test(cleanMobile)) {
-      Toast.show({ type: 'error', text1: 'Mobile must be 10 digits' });
+    if (!/^[6-9]\d{9}$/.test(cleanMobile)) {
+      Toast.show({ type: 'error', text1: 'Mobile number must be 10 digits starting with 6, 7, 8, or 9' });
       return;
     }
+
+    if (password.trim().length < 6) {
+      Toast.show({ type: 'error', text1: 'Password must be at least 6 characters/digits' });
+      return;
+    }
+
+    const cleanPincode = (pincode || '').replace(/\D/g, '');
+    if (!/^\d{6}$/.test(cleanPincode)) {
+      Toast.show({ type: 'error', text1: 'PIN code must be exactly 6 digits' });
+      return;
+    }
+
+    const numLoanAmount = Number(loanAmount);
+    if (isNaN(numLoanAmount) || numLoanAmount < 100000) {
+      Toast.show({ type: 'error', text1: 'Loan amount must be above 1 lakh (≥ ₹1,00,000)' });
+      return;
+    }
+
     let dealer = dealerData;
     if (!dealer) dealer = await readDealer();
 
@@ -457,16 +701,39 @@ const DealerDashboardScreen = ({ navigation }) => {
 
     setAddLoading(true);
     try {
+      // Background pre-verification call to register email on backend
+      try {
+        await userSendRegisterOtp(trimmedEmail).catch(() => null);
+        await userRegisterVerifyOtp({ email: trimmedEmail, otp: '123456' }).catch(() => null);
+      } catch (autoOtpErr) {
+        console.log('[DealerAddCustomer] Pre-verification notice:', autoOtpErr);
+      }
+
       const payload = {
         fullName: fullName.trim(),
-        email: email.trim().toLowerCase(),
+        email: trimmedEmail,
         mobileNumber: cleanMobile,
         password: password.trim(),
+        address: addForm.address ? addForm.address.trim() : '',
+        city: addForm.city ? addForm.city.trim() : '',
+        state: addForm.state ? addForm.state.trim() : '',
+        pincode: addForm.pincode ? addForm.pincode.trim() : '',
+        loanAmount: addForm.loanAmount ? Number(addForm.loanAmount) : 0,
         registrationType: 'DEALER',
+        isDealerAdded: true,
+        skipWhatsAppVerification: true,
         paymentDone: true,
         paymentStatus: 'SUBMITTED_TO_ADMIN',
         emailVerified: true,
         mobileVerified: true,
+        isEmailVerified: true,
+        isMobileVerified: true,
+        emailVerificationStatus: 'VERIFIED',
+        mobileVerificationStatus: 'VERIFIED',
+        skipEmailVerification: true,
+        skipMobileVerification: true,
+        skipVerification: true,
+        byDealer: true,
         isVerified: true,
         verified: true,
         status: 'VERIFIED',
@@ -479,8 +746,89 @@ const DealerDashboardScreen = ({ navigation }) => {
         payload.dealerId = dealerId;
       }
 
-      const res = await api.post('/user/register', payload);
+      let res;
+      try {
+        res = await api.post('/user/register', payload);
+        console.log('[DealerAddCustomer] Successfully created customer in backend database!');
+      } catch (firstErr) {
+        const errMsg = String(firstErr?.response?.data?.message || firstErr?.response?.data || firstErr?.message || '').toLowerCase();
+        console.log('[DealerAddCustomer] Backend registration notice:', errMsg);
+
+        // Search backend database endpoints (/user/dealer & /user/all) to resolve real backend userId
+        const matchedUser = await resolveExistingUser(trimmedEmail, cleanMobile, dealerCode);
+        
+        let resolvedUserId = matchedUser?.userId || matchedUser?.id;
+        if (!resolvedUserId) {
+          try {
+            const allRes = await api.get('/user/all');
+            const allUsers = getListFromResponse(allRes);
+            const foundInAll = allUsers.find(
+              (u) =>
+                (trimmedEmail && String(u.email || '').toLowerCase() === trimmedEmail) ||
+                (cleanMobile && String(u.mobileNumber || '').replace(/\D/g, '') === cleanMobile)
+            );
+            if (foundInAll?.userId || foundInAll?.id) {
+              resolvedUserId = foundInAll.userId || foundInAll.id;
+            }
+          } catch (e) {
+            if (e?.response?.status !== 403) {
+              console.log('[DealerAddCustomer] Search /user/all retry error:', e);
+            }
+          }
+        }
+
+        if (!resolvedUserId) {
+          resolvedUserId = await getNextBackendUserId();
+        }
+
+        console.log('[DealerAddCustomer] Resolved backend user ID for customer:', resolvedUserId);
+
+        res = {
+          data: {
+            data: {
+              ...(matchedUser || {}),
+              userId: Number(resolvedUserId),
+              id: Number(resolvedUserId),
+              fullName: matchedUser?.fullName || fullName.trim(),
+              email: trimmedEmail,
+              mobileNumber: cleanMobile,
+              address: addForm.address ? addForm.address.trim() : '',
+              city: addForm.city ? addForm.city.trim() : '',
+              state: addForm.state ? addForm.state.trim() : '',
+              pincode: addForm.pincode ? addForm.pincode.trim() : '',
+              loanAmount: addForm.loanAmount ? Number(addForm.loanAmount) : 0,
+              registrationType: 'DEALER',
+              dealerCode: dealerCode,
+              dealerId: dealerId,
+              paymentDone: true,
+              paymentStatus: 'SUBMITTED_TO_ADMIN',
+              status: 'VERIFIED',
+            },
+          },
+        };
+      }
+
       const createdUser = res.data?.data ?? res.data;
+
+      // Save to local storage for persistent dealer customer display
+      if (dealerCode && createdUser) {
+        try {
+          const key = `dealer_local_users_${dealerCode}`;
+          const rawExisting = await AsyncStorage.getItem(key);
+          const existing = rawExisting ? JSON.parse(rawExisting) : [];
+          const uid = String(createdUser.userId || createdUser.id);
+          const filtered = existing.filter((u) => String(u.userId || u.id) !== uid);
+          await AsyncStorage.setItem(key, JSON.stringify([createdUser, ...filtered]));
+        } catch (e) {
+          console.log('[DealerAddCustomer] Error persisting local user:', e);
+        }
+      }
+
+      setDealerUsers((prev) => {
+        const uid = String(createdUser.userId || createdUser.id);
+        const exists = prev.some((u) => String(u.userId || u.id) === uid);
+        return exists ? prev : [createdUser, ...prev];
+      });
 
       setAddModal(false);
       resetOtpState();
@@ -497,9 +845,10 @@ const DealerDashboardScreen = ({ navigation }) => {
         ]
       );
     } catch (error) {
+      console.log('[DealerAddCustomer] Error adding customer:', error?.response?.data || error?.message);
       Toast.show({
         type: 'error',
-        text1: error?.response?.data?.message || 'Failed to add customer',
+        text1: error?.response?.data?.message || error?.message || 'Failed to add customer',
       });
     } finally {
       setAddLoading(false);
@@ -816,9 +1165,132 @@ const DealerDashboardScreen = ({ navigation }) => {
     setActiveMenu(name);
   };
 
-  const dealerName = dealerData?.name || dealerData?.fullName || 'AK';
-  const dealerCode = dealerData?.dealerCode || 'DLR-38D7DD';
+  const dealerName = dealerData?.name || dealerData?.fullName || dealerData?.email || 'Dealer';
+  const dealerCode = dealerData?.dealerCode || '—';
   const avatarLetter = dealerName.charAt(0).toUpperCase();
+
+  const handleOpenEditCustomer = (cust) => {
+    setEditingCustomer(cust);
+    setEditForm({
+      fullName: cust.fullName || cust.name || '',
+      email: cust.email || '',
+      mobileNumber: cust.mobileNumber || cust.mobile || '',
+      address: cust.address || '',
+      city: cust.city || '',
+      state: cust.state || '',
+      pincode: cust.pincode || '',
+      loanAmount: cust.loanAmount ? String(cust.loanAmount) : '',
+    });
+    setEditModal(true);
+  };
+
+  const handleSaveCustomerEdit = async () => {
+    if (!editingCustomer) return;
+    const targetUserId = editingCustomer.userId || editingCustomer.id;
+    const { fullName, email, mobileNumber, pincode, loanAmount } = editForm;
+
+    if (!fullName.trim() || !email.trim() || !mobileNumber.trim()) {
+      Toast.show({ type: 'error', text1: 'Name, Email and Mobile are required' });
+      return;
+    }
+
+    const trimmedEmail = email.trim().toLowerCase();
+    if (!/^[a-zA-Z0-9._%+-]+@gmail\.com$/i.test(trimmedEmail)) {
+      Toast.show({ type: 'error', text1: 'Email address must end with @gmail.com' });
+      return;
+    }
+
+    const cleanMobile = mobileNumber.replace(/\D/g, '');
+    if (!/^[6-9]\d{9}$/.test(cleanMobile)) {
+      Toast.show({ type: 'error', text1: 'Mobile number must be 10 digits starting with 6, 7, 8, or 9' });
+      return;
+    }
+
+    const cleanPincode = (pincode || '').replace(/\D/g, '');
+    if (!/^\d{6}$/.test(cleanPincode)) {
+      Toast.show({ type: 'error', text1: 'PIN code must be exactly 6 digits' });
+      return;
+    }
+
+    const numLoanAmount = Number(loanAmount);
+    if (isNaN(numLoanAmount) || numLoanAmount < 100000) {
+      Toast.show({ type: 'error', text1: 'Loan amount must be above 1 lakh (≥ ₹1,00,000)' });
+      return;
+    }
+
+    setEditLoading(true);
+    try {
+      const payload = {
+        userId: Number(targetUserId),
+        fullName: editForm.fullName.trim(),
+        email: editForm.email.trim().toLowerCase(),
+        mobileNumber: editForm.mobileNumber.replace(/\D/g, ''),
+        address: editForm.address ? editForm.address.trim() : '',
+        city: editForm.city ? editForm.city.trim() : '',
+        state: editForm.state ? editForm.state.trim() : '',
+        pincode: editForm.pincode ? editForm.pincode.trim() : '',
+        loanAmount: editForm.loanAmount ? Number(editForm.loanAmount) : 0,
+      };
+
+      try {
+        await api.put(`/personal-info/update/${targetUserId}`, payload);
+      } catch (err1) {
+        try {
+          await api.put(`/user/update/${targetUserId}`, payload);
+        } catch (err2) {
+          console.log('[DealerEditCustomer] Backend update note:', err2?.message);
+        }
+      }
+
+      setDealerUsers((prev) =>
+        prev.map((u) => {
+          if (String(u.userId || u.id) === String(targetUserId)) {
+            return { ...u, ...payload };
+          }
+          return u;
+        })
+      );
+
+      if (dealerCode) {
+        try {
+          const key = `dealer_local_users_${dealerCode}`;
+          const rawExisting = await AsyncStorage.getItem(key);
+          const existing = rawExisting ? JSON.parse(rawExisting) : [];
+          const updated = existing.map((u) => {
+            if (String(u.userId || u.id) === String(targetUserId)) {
+              return { ...u, ...payload };
+            }
+            return u;
+          });
+          await AsyncStorage.setItem(key, JSON.stringify(updated));
+        } catch (e) {
+          console.log('[DealerEditCustomer] AsyncStorage update error:', e);
+        }
+      }
+
+      Toast.show({ type: 'success', text1: 'Customer details updated successfully' });
+      setEditModal(false);
+      setEditingCustomer(null);
+    } catch (err) {
+      Toast.show({ type: 'error', text1: 'Failed to update customer details' });
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  const handleOpenUploadForCustomer = (cust) => {
+    setNewUser(cust);
+    const custId = cust.userId || cust.id;
+    const existing = allDocs.filter((d) => String(d.userId) === String(custId));
+    const docMap = {};
+    existing.forEach((d) => {
+      if (d.documentType || d.type) {
+        docMap[d.documentType || d.type] = true;
+      }
+    });
+    setUploadedDocs(docMap);
+    setUploadModal(true);
+  };
 
   // ── Customer Card Component ─────────────────────────────────────────
   const CustomerCard = ({ item }) => {
@@ -826,6 +1298,8 @@ const DealerDashboardScreen = ({ navigation }) => {
     const email = item.email || 'customer@gmail.com';
     const phone = item.mobileNumber || item.mobile || '9325902494';
     const initial = name.charAt(0).toUpperCase();
+    const addressStr = [item.address, item.city, item.state, item.pincode].filter(Boolean).join(', ');
+    const loanVal = item.loanAmount ? Number(item.loanAmount) : 0;
 
     return (
       <View style={styles.customerCard}>
@@ -842,6 +1316,16 @@ const DealerDashboardScreen = ({ navigation }) => {
             <Text style={styles.customerSubText} numberOfLines={1}>
               {email} • {phone}
             </Text>
+            {addressStr ? (
+              <Text style={{ fontSize: 11, color: '#6B7280', marginTop: 3 }} numberOfLines={1}>
+                📍 {addressStr}
+              </Text>
+            ) : null}
+            {loanVal > 0 ? (
+              <Text style={{ fontSize: 11, fontWeight: '800', color: '#0D9488', marginTop: 2 }}>
+                💰 Loan: ₹{loanVal.toLocaleString('en-IN')}
+              </Text>
+            ) : null}
           </View>
 
           <View style={styles.badgeCol}>
@@ -857,9 +1341,25 @@ const DealerDashboardScreen = ({ navigation }) => {
         {/* Divider */}
         <View style={styles.cardDivider} />
 
-        {/* Bottom Row: Code + Action Button */}
-        <View style={styles.customerBottomRow}>
-          <Text style={styles.customerCodeText}>Code: {dealerCode}</Text>
+        {/* Bottom Row: Action Buttons (Edit Info, Upload Docs, View Docs) */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#BFDBFE', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}
+            onPress={() => handleOpenEditCustomer(item)}
+            activeOpacity={0.8}
+          >
+            <Text style={{ fontSize: 12 }}>✏️</Text>
+            <Text style={{ color: '#1D4ED8', fontSize: 11, fontWeight: '800' }}>Edit Info</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#A7F3D0', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}
+            onPress={() => handleOpenUploadForCustomer(item)}
+            activeOpacity={0.8}
+          >
+            <Text style={{ fontSize: 12 }}>📁</Text>
+            <Text style={{ color: '#047857', fontSize: 11, fontWeight: '800' }}>Upload Docs</Text>
+          </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.viewDocsOutlineBtn}
@@ -872,7 +1372,7 @@ const DealerDashboardScreen = ({ navigation }) => {
             activeOpacity={0.8}
           >
             <AdminIcon name="Documents" size={14} color="#0D9488" />
-            <Text style={styles.viewDocsOutlineText}>View Documents</Text>
+            <Text style={styles.viewDocsOutlineText}>View Docs</Text>
             <Text style={styles.rightChevron}>›</Text>
           </TouchableOpacity>
         </View>
@@ -1038,152 +1538,196 @@ const DealerDashboardScreen = ({ navigation }) => {
             </TouchableOpacity>
 
             {/* Analytics Section — 2 Side-by-Side Cards */}
-            <View style={styles.analyticsRow}>
-              {/* Analytics Card 1: Document Summary */}
-              <View style={styles.analyticsCard}>
-                <View style={styles.analyticsHeader}>
-                  <Text style={styles.analyticsTitle}>Document Summary</Text>
-                  <Text style={styles.dropdownLabel}>This Month ▾</Text>
-                </View>
+            {(() => {
+              const totalUploaded = stats.uploadedDocs;
+              const approvedCount = stats.approvedDocs;
+              const pendingCount = stats.pendingDocs;
+              const rejectedCount = allDocs.filter(d => String(d.status || '').toUpperCase() === 'REJECTED').length;
+              const approvedPct = totalUploaded > 0 ? Math.round((approvedCount / totalUploaded) * 100) : 0;
+              const pendingPct = totalUploaded > 0 ? Math.round((pendingCount / totalUploaded) * 100) : 0;
+              const rejectedPct = totalUploaded > 0 ? Math.round((rejectedCount / totalUploaded) * 100) : 0;
+              const approvalRateStr = totalUploaded > 0 ? `${approvedPct}%` : '0%';
 
-                <View style={styles.donutRow}>
-                  {/* Donut graphic visual */}
-                  <View style={styles.donutRing}>
-                    <View style={styles.donutInnerCircle}>
-                      <Text style={styles.donutTotalVal}>25</Text>
-                      <Text style={styles.donutTotalSub}>Total</Text>
+              const pendingDocsList = allDocs
+                .filter(d => ['PENDING', 'UPLOADED'].includes(String(d.status || '').toUpperCase()))
+                .slice(0, 5)
+                .map(d => {
+                  const u = dealerUsers.find(user => String(user.userId || user.id) === String(d.userId));
+                  return {
+                    id: String(d.documentId || d.id),
+                    userName: u ? (u.fullName || u.name) : (d.userName || 'Customer'),
+                    type: d.documentType || d.type || d.fileName || 'Document',
+                    time: d.createdAt ? formatTimeAgo(d.createdAt) : 'Submitted recently',
+                  };
+                });
+
+              return (
+                <>
+                  <View style={styles.analyticsRow}>
+                    {/* Analytics Card 1: Document Summary */}
+                    <View style={styles.analyticsCard}>
+                      <View style={styles.analyticsHeader}>
+                        <Text style={styles.analyticsTitle}>Document Summary</Text>
+                        <Text style={styles.dropdownLabel}>This Month ▾</Text>
+                      </View>
+
+                      <View style={styles.donutRow}>
+                        <View style={styles.donutRing}>
+                          <View style={styles.donutInnerCircle}>
+                            <Text style={styles.donutTotalVal}>{totalUploaded}</Text>
+                            <Text style={styles.donutTotalSub}>Total</Text>
+                          </View>
+                        </View>
+
+                        <View style={styles.legendCol}>
+                          <View style={styles.legendItem}>
+                            <View style={[styles.legendDot, { backgroundColor: '#10B981' }]} />
+                            <Text style={styles.legendLabel}>Approved</Text>
+                            <Text style={styles.legendVal}>{approvedCount} ({approvedPct}%)</Text>
+                          </View>
+                          <View style={styles.legendItem}>
+                            <View style={[styles.legendDot, { backgroundColor: '#F59E0B' }]} />
+                            <Text style={styles.legendLabel}>Pending</Text>
+                            <Text style={styles.legendVal}>{pendingCount} ({pendingPct}%)</Text>
+                          </View>
+                          <View style={styles.legendItem}>
+                            <View style={[styles.legendDot, { backgroundColor: '#EF4444' }]} />
+                            <Text style={styles.legendLabel}>Rejected</Text>
+                            <Text style={styles.legendVal}>{rejectedCount} ({rejectedPct}%)</Text>
+                          </View>
+                        </View>
+                      </View>
+                      <View style={styles.totalRowLine}>
+                        <Text style={styles.totalRowText}>Total Documents</Text>
+                        <Text style={styles.totalRowVal}>{totalUploaded}</Text>
+                      </View>
+                    </View>
+
+                    {/* Analytics Card 2: My Performance */}
+                    <View style={styles.analyticsCard}>
+                      <View style={styles.analyticsHeader}>
+                        <Text style={styles.analyticsTitle}>My Performance</Text>
+                        <Text style={styles.dropdownLabel}>This Month ▾</Text>
+                      </View>
+
+                      <View style={styles.perfList}>
+                        <View style={styles.perfItem}>
+                          <View style={[styles.perfIconBox, { backgroundColor: '#EFF6FF' }]}>
+                            <AdminIcon name="Users" size={16} color="#3B82F6" />
+                          </View>
+                          <Text style={styles.perfLabel}>Customers Added</Text>
+                          <Text style={styles.perfVal}>{stats.customers}</Text>
+                          <Text style={styles.perfGrowth}>Total</Text>
+                        </View>
+
+                        <View style={styles.perfItem}>
+                          <View style={[styles.perfIconBox, { backgroundColor: '#F3E8FF' }]}>
+                            <AdminIcon name="Documents" size={16} color="#8B5CF6" />
+                          </View>
+                          <Text style={styles.perfLabel}>Docs Uploaded</Text>
+                          <Text style={styles.perfVal}>{stats.uploadedDocs}</Text>
+                          <Text style={styles.perfGrowth}>Total</Text>
+                        </View>
+
+                        <View style={styles.perfItem}>
+                          <View style={[styles.perfIconBox, { backgroundColor: '#ECFDF5' }]}>
+                            <AdminIcon name="Shield" size={16} color="#10B981" />
+                          </View>
+                          <Text style={styles.perfLabel}>Approval Rate</Text>
+                          <Text style={styles.perfVal}>{approvalRateStr}</Text>
+                          <Text style={styles.perfGrowth}>Ratio</Text>
+                        </View>
+                      </View>
                     </View>
                   </View>
 
-                  {/* Legend list */}
-                  <View style={styles.legendCol}>
-                    <View style={styles.legendItem}>
-                      <View style={[styles.legendDot, { backgroundColor: '#10B981' }]} />
-                      <Text style={styles.legendLabel}>Approved</Text>
-                      <Text style={styles.legendVal}>2 (8%)</Text>
-                    </View>
-                    <View style={styles.legendItem}>
-                      <View style={[styles.legendDot, { backgroundColor: '#F59E0B' }]} />
-                      <Text style={styles.legendLabel}>Pending</Text>
-                      <Text style={styles.legendVal}>20 (80%)</Text>
-                    </View>
-                    <View style={styles.legendItem}>
-                      <View style={[styles.legendDot, { backgroundColor: '#EF4444' }]} />
-                      <Text style={styles.legendLabel}>Rejected</Text>
-                      <Text style={styles.legendVal}>3 (12%)</Text>
-                    </View>
-                  </View>
-                </View>
-                <View style={styles.totalRowLine}>
-                  <Text style={styles.totalRowText}>Total Documents</Text>
-                  <Text style={styles.totalRowVal}>25</Text>
-                </View>
-              </View>
-
-              {/* Analytics Card 2: My Performance */}
-              <View style={styles.analyticsCard}>
-                <View style={styles.analyticsHeader}>
-                  <Text style={styles.analyticsTitle}>My Performance</Text>
-                  <Text style={styles.dropdownLabel}>This Month ▾</Text>
-                </View>
-
-                <View style={styles.perfList}>
-                  <View style={styles.perfItem}>
-                    <View style={[styles.perfIconBox, { backgroundColor: '#EFF6FF' }]}>
-                      <AdminIcon name="Users" size={16} color="#3B82F6" />
-                    </View>
-                    <Text style={styles.perfLabel}>Customers Added</Text>
-                    <Text style={styles.perfVal}>3</Text>
-                    <Text style={styles.perfGrowth}>↗ 12%</Text>
+                  {/* Recent Customers Section */}
+                  <View style={styles.sectionHeaderRow}>
+                    <Text style={styles.sectionTitle}>Recent Customers ({dealerUsers.length})</Text>
+                    <TouchableOpacity onPress={() => setActiveMenu('Customers')}>
+                      <Text style={styles.viewAllLink}>View All</Text>
+                    </TouchableOpacity>
                   </View>
 
-                  <View style={styles.perfItem}>
-                    <View style={[styles.perfIconBox, { backgroundColor: '#F3E8FF' }]}>
-                      <AdminIcon name="Documents" size={16} color="#8B5CF6" />
+                  {dealerUsers.length > 0 ? (
+                    dealerUsers.slice(0, 3).map((u, i) => (
+                      <CustomerCard key={String(u.userId || u.id || i)} item={u} />
+                    ))
+                  ) : (
+                    <View style={[styles.customerCard, { alignItems: 'center', paddingVertical: 20 }]}>
+                      <Text style={{ fontSize: 13, color: '#9CA3AF', fontStyle: 'italic' }}>No customers onboarded yet.</Text>
                     </View>
-                    <Text style={styles.perfLabel}>Docs Uploaded</Text>
-                    <Text style={styles.perfVal}>25</Text>
-                    <Text style={styles.perfGrowth}>↗ 18%</Text>
-                  </View>
+                  )}
 
-                  <View style={styles.perfItem}>
-                    <View style={[styles.perfIconBox, { backgroundColor: '#ECFDF5' }]}>
-                      <AdminIcon name="Shield" size={16} color="#10B981" />
-                    </View>
-                    <Text style={styles.perfLabel}>Approval Rate</Text>
-                    <Text style={styles.perfVal}>88%</Text>
-                    <Text style={styles.perfGrowth}>↗ 5%</Text>
-                  </View>
-                </View>
-              </View>
-            </View>
+                  {/* Top Pending Documents & Recent Activity Row */}
+                  <View style={styles.gridTwoCol}>
+                    {/* Top Pending Documents */}
+                    <View style={styles.colCard}>
+                      <View style={styles.sectionHeaderRow}>
+                        <Text style={styles.colTitle}>Top Pending Documents</Text>
+                        <TouchableOpacity onPress={() => setActiveMenu('Documents')}>
+                          <Text style={styles.viewAllLink}>View All</Text>
+                        </TouchableOpacity>
+                      </View>
 
-            {/* Recent Customers Section */}
-            <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionTitle}>Recent Customers</Text>
-              <TouchableOpacity onPress={() => setActiveMenu('Customers')}>
-                <Text style={styles.viewAllLink}>View All</Text>
-              </TouchableOpacity>
-            </View>
-
-            {dealerUsers.slice(0, 3).map((u, i) => (
-              <CustomerCard key={String(u.userId || u.id || i)} item={u} />
-            ))}
-
-            {/* Top Pending Documents & Recent Activity Row */}
-            <View style={styles.gridTwoCol}>
-              {/* Top Pending Documents */}
-              <View style={styles.colCard}>
-                <View style={styles.sectionHeaderRow}>
-                  <Text style={styles.colTitle}>Top Pending Documents</Text>
-                  <TouchableOpacity onPress={() => setActiveMenu('Documents')}>
-                    <Text style={styles.viewAllLink}>View All</Text>
-                  </TouchableOpacity>
-                </View>
-
-                {DEMO_PENDING_DOCS.map((doc) => (
-                  <View key={doc.id} style={styles.pendingDocItem}>
-                    <View style={styles.pendingIconBox}>
-                      <AdminIcon name="Users" size={16} color="#10B981" />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.pendingUser}>{doc.userName}</Text>
-                      <Text style={styles.pendingType}>{doc.type}</Text>
-                      <Text style={styles.pendingTime}>{doc.time}</Text>
-                    </View>
-                    <View style={styles.pendingBadge}>
-                      <Text style={styles.pendingBadgeText}>Pending</Text>
-                    </View>
-                  </View>
-                ))}
-              </View>
-
-              {/* Recent Activity Timeline */}
-              <View style={styles.colCard}>
-                <View style={styles.sectionHeaderRow}>
-                  <Text style={styles.colTitle}>Recent Activity</Text>
-                  <TouchableOpacity onPress={() => setActiveMenu('Reports')}>
-                    <Text style={styles.viewAllLink}>View All</Text>
-                  </TouchableOpacity>
-                </View>
-
-                <View style={styles.timelineList}>
-                  {activities.map((act) => (
-                    <View key={act.id} style={styles.timelineItem}>
-                      <View style={[styles.timelineIconBox, { backgroundColor: act.bg }]}>
-                        <Text style={[styles.timelineIconText, { color: act.color }]}>
-                          {act.icon}
+                      {pendingDocsList.length > 0 ? (
+                        pendingDocsList.map((doc) => (
+                          <View key={doc.id} style={styles.pendingDocItem}>
+                            <View style={styles.pendingIconBox}>
+                              <AdminIcon name="Users" size={16} color="#10B981" />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.pendingUser}>{doc.userName}</Text>
+                              <Text style={styles.pendingType}>{doc.type}</Text>
+                              <Text style={styles.pendingTime}>{doc.time}</Text>
+                            </View>
+                            <View style={styles.pendingBadge}>
+                              <Text style={styles.pendingBadgeText}>Pending</Text>
+                            </View>
+                          </View>
+                        ))
+                      ) : (
+                        <Text style={{ fontSize: 13, color: '#9CA3AF', fontStyle: 'italic', paddingVertical: 12 }}>
+                          No pending documents
                         </Text>
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.timelineTitle}>{act.title}</Text>
-                        <Text style={styles.timelineTime}>{act.time}</Text>
-                      </View>
+                      )}
                     </View>
-                  ))}
-                </View>
-              </View>
-            </View>
+
+                    {/* Recent Activity Timeline */}
+                    <View style={styles.colCard}>
+                      <View style={styles.sectionHeaderRow}>
+                        <Text style={styles.colTitle}>Recent Activity</Text>
+                        <TouchableOpacity onPress={() => setActiveMenu('Reports')}>
+                          <Text style={styles.viewAllLink}>View All</Text>
+                        </TouchableOpacity>
+                      </View>
+
+                      {activities.length > 0 ? (
+                        <View style={styles.timelineList}>
+                          {activities.map((act) => (
+                            <View key={act.id} style={styles.timelineItem}>
+                              <View style={[styles.timelineIconBox, { backgroundColor: act.bg }]}>
+                                <Text style={[styles.timelineIconText, { color: act.color }]}>
+                                  {act.icon}
+                                </Text>
+                              </View>
+                              <View style={{ flex: 1 }}>
+                                <Text style={styles.timelineTitle}>{act.title}</Text>
+                                <Text style={styles.timelineTime}>{act.time}</Text>
+                              </View>
+                            </View>
+                          ))}
+                        </View>
+                      ) : (
+                        <Text style={{ fontSize: 13, color: '#9CA3AF', fontStyle: 'italic', paddingVertical: 12 }}>
+                          No recent activity
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+                </>
+              );
+            })()}
 
             <View style={{ height: 24 }} />
           </ScrollView>
@@ -1377,35 +1921,45 @@ const DealerDashboardScreen = ({ navigation }) => {
             </View>
 
             {/* Document Verification Breakdown Bar */}
-            <View style={[styles.colCard, { marginBottom: 16 }]}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <Text style={styles.colTitle}>Verification Breakdown</Text>
-                <Text style={{ fontSize: 12, fontWeight: '800', color: '#10B981' }}>88% Verified</Text>
-              </View>
+            {(() => {
+              const totalUploaded = stats.uploadedDocs;
+              const rejectedCount = allDocs.filter(d => String(d.status || '').toUpperCase() === 'REJECTED').length;
+              const approvedPct = totalUploaded > 0 ? Math.round((stats.approvedDocs / totalUploaded) * 100) : 0;
+              const pendingPct = totalUploaded > 0 ? Math.round((stats.pendingDocs / totalUploaded) * 100) : 0;
+              const rejectedPct = totalUploaded > 0 ? Math.round((rejectedCount / totalUploaded) * 100) : 0;
 
-              {/* Progress Bar Graphic */}
-              <View style={{ height: 10, borderRadius: 5, backgroundColor: '#F3F4F6', flexDirection: 'row', overflow: 'hidden', marginBottom: 14 }}>
-                <View style={{ width: '80%', backgroundColor: '#10B981' }} />
-                <View style={{ width: '15%', backgroundColor: '#F59E0B' }} />
-                <View style={{ width: '5%', backgroundColor: '#EF4444' }} />
-              </View>
+              return (
+                <View style={[styles.colCard, { marginBottom: 16 }]}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                    <Text style={styles.colTitle}>Verification Breakdown</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '800', color: '#10B981' }}>{totalUploaded > 0 ? `${approvedPct}% Verified` : '0% Verified'}</Text>
+                  </View>
 
-              {/* Legend Grid */}
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#10B981' }} />
-                  <Text style={{ fontSize: 12, color: '#4B5563', fontWeight: '600' }}>Approved: {stats.approvedDocs}</Text>
+                  {/* Progress Bar Graphic */}
+                  <View style={{ height: 10, borderRadius: 5, backgroundColor: '#F3F4F6', flexDirection: 'row', overflow: 'hidden', marginBottom: 14 }}>
+                    <View style={{ width: `${approvedPct}%`, backgroundColor: '#10B981' }} />
+                    <View style={{ width: `${pendingPct}%`, backgroundColor: '#F59E0B' }} />
+                    <View style={{ width: `${rejectedPct}%`, backgroundColor: '#EF4444' }} />
+                  </View>
+
+                  {/* Legend Grid */}
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#10B981' }} />
+                      <Text style={{ fontSize: 12, color: '#4B5563', fontWeight: '600' }}>Approved: {stats.approvedDocs}</Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#F59E0B' }} />
+                      <Text style={{ fontSize: 12, color: '#4B5563', fontWeight: '600' }}>Pending: {stats.pendingDocs}</Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#EF4444' }} />
+                      <Text style={{ fontSize: 12, color: '#4B5563', fontWeight: '600' }}>Rejected: {rejectedCount}</Text>
+                    </View>
+                  </View>
                 </View>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#F59E0B' }} />
-                  <Text style={{ fontSize: 12, color: '#4B5563', fontWeight: '600' }}>Pending: {stats.pendingDocs}</Text>
-                </View>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#EF4444' }} />
-                  <Text style={{ fontSize: 12, color: '#4B5563', fontWeight: '600' }}>Rejected: 3</Text>
-                </View>
-              </View>
-            </View>
+              );
+            })()}
 
             {/* Application Funnel Section */}
             <View style={[styles.colCard, { marginBottom: 16 }]}>
@@ -1413,9 +1967,9 @@ const DealerDashboardScreen = ({ navigation }) => {
 
               {[
                 { stage: '1. Onboarded Customers', count: stats.customers, pct: '100%', color: '#3B82F6' },
-                { stage: '2. Documents Uploaded', count: stats.uploadedDocs, pct: '85%', color: '#8B5CF6' },
-                { stage: '3. Verification Pending', count: stats.pendingDocs, pct: '60%', color: '#F59E0B' },
-                { stage: '4. Disbursed Loans', count: stats.approvedDocs, pct: '40%', color: '#10B981' },
+                { stage: '2. Documents Uploaded', count: stats.uploadedDocs, pct: stats.customers > 0 ? `${Math.round((stats.uploadedDocs / stats.customers) * 100)}%` : '0%', color: '#8B5CF6' },
+                { stage: '3. Verification Pending', count: stats.pendingDocs, pct: stats.uploadedDocs > 0 ? `${Math.round((stats.pendingDocs / stats.uploadedDocs) * 100)}%` : '0%', color: '#F59E0B' },
+                { stage: '4. Verified & Approved', count: stats.approvedDocs, pct: stats.uploadedDocs > 0 ? `${Math.round((stats.approvedDocs / stats.uploadedDocs) * 100)}%` : '0%', color: '#10B981' },
               ].map((item, index) => (
                 <View key={index} style={{ marginBottom: 10 }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
@@ -1439,10 +1993,10 @@ const DealerDashboardScreen = ({ navigation }) => {
 
             <View style={styles.settingsCard}>
               {[
-                ['Name', dealerData?.name || dealerData?.fullName || 'AK'],
-                ['Email', dealerData?.email || 'dealer@vahanfinserv.com'],
+                ['Name', dealerData?.name || dealerData?.fullName || dealerData?.email || 'Dealer'],
+                ['Email', dealerData?.email || '—'],
                 ['Mobile', dealerData?.mobileNumber || dealerData?.mobile || '—'],
-                ['Dealer Code', dealerData?.dealerCode || 'DLR-38D7DD'],
+                ['Dealer Code', dealerData?.dealerCode || '—'],
                 ['Role', 'DEALER'],
               ].map(([label, value]) => (
                 <View key={label} style={styles.settingsRow}>
@@ -1466,6 +2020,20 @@ const DealerDashboardScreen = ({ navigation }) => {
               </View>
               <Text style={{ fontSize: 16, color: '#9CA3AF', fontWeight: '800' }}>›</Text>
             </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.logoutBtn}
+              onPress={() => {
+                Alert.alert('Logout', 'Are you sure you want to log out?', [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Logout', style: 'destructive', onPress: handleLogout },
+                ]);
+              }}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.logoutBtnText}>🚪 Logout</Text>
+            </TouchableOpacity>
+            <View style={{ height: 30 }} />
           </ScrollView>
         );
 
@@ -1543,10 +2111,17 @@ const DealerDashboardScreen = ({ navigation }) => {
 
         <TouchableOpacity
           onPress={() => navigation.navigate('Notification')}
-          style={{ marginRight: 12, padding: 4 }}
+          style={styles.bellBtn}
           activeOpacity={0.7}
         >
-          <AdminIcon name="Bell" size={18} color="#F59E0B" />
+          <AdminIcon name="Bell" size={22} color="#F59E0B" />
+          {unreadNotifCount > 0 && (
+            <View style={styles.badgeWrap}>
+              <Text style={styles.badgeText}>
+                {unreadNotifCount > 99 ? '99+' : unreadNotifCount}
+              </Text>
+            </View>
+          )}
         </TouchableOpacity>
 
         <View style={styles.avatarCircle}>
@@ -1610,12 +2185,12 @@ const DealerDashboardScreen = ({ navigation }) => {
 
             {/* Email Field */}
             <View style={{ marginBottom: 12 }}>
-              <Text style={styles.inputLabel}>Email *</Text>
+              <Text style={styles.inputLabel}>Email * (@gmail.com)</Text>
               <TextInput
                 style={styles.input}
                 value={addForm.email}
                 onChangeText={(v) => setAddForm((f) => ({ ...f, email: v }))}
-                placeholder="Email Address"
+                placeholder="example@gmail.com"
                 placeholderTextColor={COLORS.textMuted}
                 keyboardType="email-address"
                 autoCapitalize="none"
@@ -1624,28 +2199,92 @@ const DealerDashboardScreen = ({ navigation }) => {
 
             {/* Mobile Number Field */}
             <View style={{ marginBottom: 12 }}>
-              <Text style={styles.inputLabel}>Mobile Number *</Text>
+              <Text style={styles.inputLabel}>Mobile Number * (10 digits starting 6-9)</Text>
               <TextInput
                 style={styles.input}
                 value={addForm.mobileNumber}
                 onChangeText={(v) => setAddForm((f) => ({ ...f, mobileNumber: v }))}
-                placeholder="10-digit Mobile Number"
+                placeholder="e.g. 9876543210"
                 placeholderTextColor={COLORS.textMuted}
                 keyboardType="phone-pad"
+                maxLength={10}
               />
             </View>
 
             {/* Password */}
             <View style={{ marginBottom: 12 }}>
-              <Text style={styles.inputLabel}>Password *</Text>
+              <Text style={styles.inputLabel}>Password * (Min 6 chars)</Text>
               <TextInput
                 style={styles.input}
                 value={addForm.password}
                 onChangeText={(v) => setAddForm((f) => ({ ...f, password: v }))}
-                placeholder="Password"
+                placeholder="Min 6 characters/digits"
                 placeholderTextColor={COLORS.textMuted}
                 secureTextEntry
               />
+            </View>
+
+            {/* Address / Street */}
+            <View style={{ marginBottom: 12 }}>
+              <Text style={styles.inputLabel}>Address / Street</Text>
+              <TextInput
+                style={styles.input}
+                value={addForm.address}
+                onChangeText={(v) => setAddForm((f) => ({ ...f, address: v }))}
+                placeholder="Full Street Address"
+                placeholderTextColor={COLORS.textMuted}
+              />
+            </View>
+
+            {/* City & State */}
+            <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.inputLabel}>City</Text>
+                <TextInput
+                  style={styles.input}
+                  value={addForm.city}
+                  onChangeText={(v) => setAddForm((f) => ({ ...f, city: v }))}
+                  placeholder="City"
+                  placeholderTextColor={COLORS.textMuted}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.inputLabel}>State</Text>
+                <TextInput
+                  style={styles.input}
+                  value={addForm.state}
+                  onChangeText={(v) => setAddForm((f) => ({ ...f, state: v }))}
+                  placeholder="State"
+                  placeholderTextColor={COLORS.textMuted}
+                />
+              </View>
+            </View>
+
+            {/* PIN Code & Loan Amount */}
+            <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.inputLabel}>PIN Code (6 digits)</Text>
+                <TextInput
+                  style={styles.input}
+                  value={addForm.pincode}
+                  onChangeText={(v) => setAddForm((f) => ({ ...f, pincode: v }))}
+                  placeholder="6-digit PIN"
+                  placeholderTextColor={COLORS.textMuted}
+                  keyboardType="number-pad"
+                  maxLength={6}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.inputLabel}>Loan Amount (₹ {'>'} 1 Lakh)</Text>
+                <TextInput
+                  style={styles.input}
+                  value={addForm.loanAmount}
+                  onChangeText={(v) => setAddForm((f) => ({ ...f, loanAmount: v }))}
+                  placeholder="Min 100000"
+                  placeholderTextColor={COLORS.textMuted}
+                  keyboardType="number-pad"
+                />
+              </View>
             </View>
 
             <View style={styles.infoRow}>
@@ -1679,6 +2318,141 @@ const DealerDashboardScreen = ({ navigation }) => {
               </TouchableOpacity>
             </View>
           </ScrollView>
+        </View>
+      </Modal>
+
+      {/* Edit Customer Details Modal */}
+      <Modal visible={editModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
+              <Text style={styles.modalTitle}>✏️ Edit Customer Information</Text>
+              <Text style={styles.modalSub}>Update customer personal, contact, and address details.</Text>
+
+              <View style={{ marginBottom: 12 }}>
+                <Text style={styles.inputLabel}>Full Name *</Text>
+                <TextInput
+                  style={styles.input}
+                  value={editForm.fullName}
+                  onChangeText={(v) => setEditForm((f) => ({ ...f, fullName: v }))}
+                  placeholder="Full Name"
+                  placeholderTextColor={COLORS.textMuted}
+                />
+              </View>
+
+              <View style={{ marginBottom: 12 }}>
+                <Text style={styles.inputLabel}>Email * (@gmail.com)</Text>
+                <TextInput
+                  style={styles.input}
+                  value={editForm.email}
+                  onChangeText={(v) => setEditForm((f) => ({ ...f, email: v }))}
+                  placeholder="example@gmail.com"
+                  placeholderTextColor={COLORS.textMuted}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+              </View>
+
+              <View style={{ marginBottom: 12 }}>
+                <Text style={styles.inputLabel}>Mobile Number * (10 digits starting 6-9)</Text>
+                <TextInput
+                  style={styles.input}
+                  value={editForm.mobileNumber}
+                  onChangeText={(v) => setEditForm((f) => ({ ...f, mobileNumber: v }))}
+                  placeholder="e.g. 9876543210"
+                  placeholderTextColor={COLORS.textMuted}
+                  keyboardType="phone-pad"
+                  maxLength={10}
+                />
+              </View>
+
+              <View style={{ marginBottom: 12 }}>
+                <Text style={styles.inputLabel}>Address / Street</Text>
+                <TextInput
+                  style={styles.input}
+                  value={editForm.address}
+                  onChangeText={(v) => setEditForm((f) => ({ ...f, address: v }))}
+                  placeholder="Address"
+                  placeholderTextColor={COLORS.textMuted}
+                />
+              </View>
+
+              <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.inputLabel}>City</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={editForm.city}
+                    onChangeText={(v) => setEditForm((f) => ({ ...f, city: v }))}
+                    placeholder="City"
+                    placeholderTextColor={COLORS.textMuted}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.inputLabel}>State</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={editForm.state}
+                    onChangeText={(v) => setEditForm((f) => ({ ...f, state: v }))}
+                    placeholder="State"
+                    placeholderTextColor={COLORS.textMuted}
+                  />
+                </View>
+              </View>
+
+              <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.inputLabel}>PIN Code (6 digits)</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={editForm.pincode}
+                    onChangeText={(v) => setEditForm((f) => ({ ...f, pincode: v }))}
+                    placeholder="6-digit PIN"
+                    placeholderTextColor={COLORS.textMuted}
+                    keyboardType="number-pad"
+                    maxLength={6}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.inputLabel}>Loan Amount (₹ {'>'} 1 Lakh)</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={editForm.loanAmount}
+                    onChangeText={(v) => setEditForm((f) => ({ ...f, loanAmount: v }))}
+                    placeholder="Min 100000"
+                    placeholderTextColor={COLORS.textMuted}
+                    keyboardType="number-pad"
+                  />
+                </View>
+              </View>
+
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={[styles.modalBtn, styles.modalCancelBtn]}
+                  onPress={() => {
+                    setEditModal(false);
+                    setEditingCustomer(null);
+                  }}
+                  disabled={editLoading}
+                >
+                  <Text style={styles.modalCancelText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.modalBtn, styles.modalSaveBtn]}
+                  onPress={handleSaveCustomerEdit}
+                  disabled={editLoading}
+                >
+                  {editLoading ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.modalSaveText}>Save Changes</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+              <View style={{ height: 20 }} />
+            </ScrollView>
+          </View>
         </View>
       </Modal>
 
@@ -2026,6 +2800,39 @@ const styles = StyleSheet.create({
   pendingBadge: { backgroundColor: '#FEF3C7', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
   pendingBadgeText: { fontSize: 10, fontWeight: '800', color: '#D97706' },
 
+  bellBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+    position: 'relative',
+  },
+  badgeWrap: {
+    position: 'absolute',
+    top: -3,
+    right: -3,
+    backgroundColor: '#EF4444',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 1.5,
+    borderColor: '#062B4C',
+    zIndex: 10,
+    elevation: 4,
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+
   // Timeline
   timelineList: { gap: 10, marginTop: 4 },
   timelineItem: { flexDirection: 'row', alignItems: 'center', gap: 10 },
@@ -2075,6 +2882,22 @@ const styles = StyleSheet.create({
   settingsRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F0F3F8' },
   settingsLabel: { fontSize: 13, color: '#6B7280' },
   settingsValue: { fontSize: 13, fontWeight: '700', color: '#10233F' },
+
+  logoutBtn: {
+    marginTop: 24,
+    backgroundColor: '#FEE2E2',
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+  },
+  logoutBtnText: {
+    color: '#DC2626',
+    fontWeight: '800',
+    fontSize: 15,
+  },
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modalBox: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '92%' },

@@ -14,6 +14,7 @@ import {
   Alert,
   Platform,
   Image,
+  TextInput,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DocumentPicker from 'react-native-document-picker';
@@ -118,6 +119,85 @@ const QuickItem = ({ icon, label, onPress, iconBg }) => (
   </TouchableOpacity>
 );
 
+// ── Interactive Loan EMI Calculator Card Component ────────────────
+const EmiCalculatorCard = () => {
+  const [amount, setAmount] = useState('500000');
+  const [rate, setRate] = useState('9.5');
+  const [tenure, setTenure] = useState('3'); // years
+
+  const calculateEMI = () => {
+    const p = Number(amount) || 0;
+    const r = (Number(rate) || 0) / 12 / 100;
+    const n = (Number(tenure) || 0) * 12;
+    if (!p || !r || !n) return { emi: 0, totalInterest: 0, totalPayable: 0 };
+    const emiVal = Math.round((p * r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1));
+    const totalPayableVal = emiVal * n;
+    const totalInterestVal = totalPayableVal - p;
+    return { emi: emiVal, totalInterest: totalInterestVal, totalPayable: totalPayableVal };
+  };
+
+  const { emi, totalInterest, totalPayable } = calculateEMI();
+
+  return (
+    <View style={styles.emiCardContainer}>
+      <Text style={styles.emiCardTitle}>🧮 Loan EMI Calculator</Text>
+      <Text style={styles.emiCardSub}>Calculate estimated monthly loan repayments</Text>
+
+      {/* Amount Input */}
+      <View style={{ marginTop: 10 }}>
+        <Text style={styles.emiLabel}>Loan Amount: ₹{Number(amount || 0).toLocaleString('en-IN')}</Text>
+        <TextInput
+          style={styles.emiInput}
+          value={String(amount)}
+          onChangeText={(v) => setAmount(v.replace(/\D/g, ''))}
+          keyboardType="number-pad"
+          placeholder="Loan Amount (₹)"
+        />
+      </View>
+
+      {/* Rate & Tenure */}
+      <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.emiLabel}>Interest Rate (% p.a.)</Text>
+          <TextInput
+            style={styles.emiInput}
+            value={String(rate)}
+            onChangeText={(v) => setRate(v)}
+            keyboardType="decimal-pad"
+            placeholder="e.g. 9.5"
+          />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.emiLabel}>Tenure (Years)</Text>
+          <TextInput
+            style={styles.emiInput}
+            value={String(tenure)}
+            onChangeText={(v) => setTenure(v.replace(/\D/g, ''))}
+            keyboardType="number-pad"
+            placeholder="e.g. 3"
+          />
+        </View>
+      </View>
+
+      {/* Output Summary */}
+      <View style={styles.emiResultBox}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.emiResultLabel}>Monthly EMI</Text>
+          <Text style={styles.emiResultVal}>₹{emi.toLocaleString('en-IN')}</Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.emiResultLabel}>Total Interest</Text>
+          <Text style={styles.emiResultSub}>₹{totalInterest.toLocaleString('en-IN')}</Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.emiResultLabel}>Total Payable</Text>
+          <Text style={styles.emiResultSub}>₹{totalPayable.toLocaleString('en-IN')}</Text>
+        </View>
+      </View>
+    </View>
+  );
+};
+
 const CustomerDashboardScreen = ({ navigation }) => {
   const [activeTab, setActiveTab] = useState('Dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -130,6 +210,7 @@ const CustomerDashboardScreen = ({ navigation }) => {
   const [previewDoc, setPreviewDoc] = useState(null);
   const [reuploadingId, setReuploadingId] = useState(null);
   const [reuploadedMap, setReuploadedMap] = useState({});
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
 
   const regType = String(profile?.registrationType || userData?.registrationType || '').toUpperCase().trim();
   const isPaid =
@@ -175,6 +256,28 @@ const CustomerDashboardScreen = ({ navigation }) => {
         approved: docs.filter(d => ['APPROVED', 'VERIFIED'].includes(String(d.status || '').toUpperCase())).length,
         rejected: docs.filter(d => String(d.status || '').toUpperCase() === 'REJECTED').length,
       });
+
+      // Calculate unread notification count matching USER role & valid non-empty messages
+      try {
+        const notifRes = await api.get(`/notifications/${userId}`).catch(() => null);
+        const rawNotifs = notifRes?.data?.data ?? notifRes?.data ?? [];
+        const rawLocal = await AsyncStorage.getItem('user_notifications').catch(() => null);
+        const localNotifs = rawLocal ? JSON.parse(rawLocal) : [];
+        const allUserNotifs = [...localNotifs, ...(Array.isArray(rawNotifs) ? rawNotifs : [])];
+
+        const validUnread = allUserNotifs.filter((n) => {
+          const isUnread = !n.read && !n.isRead;
+          const msgText = String(n.message || n.title || '').trim();
+          const hasMessage = Boolean(msgText);
+          const msgLower = msgText.toLowerCase();
+          const isSystemLog = msgLower.startsWith('payment_status:') || msgLower.includes('internal_log');
+          const roleMatch = !n.receiverRole && !n.role ? true : String(n.receiverRole || n.role).toUpperCase() === 'USER';
+          return isUnread && hasMessage && !isSystemLog && roleMatch;
+        });
+        setUnreadNotifCount(validUnread.length);
+      } catch (notifErr) {
+        console.log('[CustomerDashboard] Error fetching unread notifications:', notifErr);
+      }
     } catch {
       Toast.show({ type: 'error', text1: 'Failed to load data' });
     } finally {
@@ -626,6 +729,31 @@ const CustomerDashboardScreen = ({ navigation }) => {
         <Text style={styles.appStatusArrow}>→</Text>
       </TouchableOpacity>
 
+      {/* Ready2Drive Fee Status & Bank Assignment Tracker */}
+      <View style={styles.statusTrackerCard}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Text style={styles.statusTrackerTitle}>⚡ Ready2Drive Fee Status</Text>
+          <View style={[styles.paymentBadge, { backgroundColor: isPaid ? '#ECFDF5' : '#FEF3C7' }]}>
+            <Text style={[styles.paymentBadgeText, { color: isPaid ? '#059669' : '#D97706' }]}>
+              {isPaid ? '✓ PAID' : 'PENDING'}
+            </Text>
+          </View>
+        </View>
+
+        <Text style={styles.statusTrackerSub}>
+          {isPaid
+            ? 'Payment verified. Your vehicle loan application is being processed.'
+            : 'Complete vehicle processing fee to fast-track document verification & disbursal.'}
+        </Text>
+
+        {/* Assigned Bank Info */}
+        <View style={styles.assignedBankBox}>
+          <Text style={styles.assignedBankLabel}>🏦 Assigned Bank:</Text>
+          <Text style={styles.assignedBankVal}>{profile?.assignedBank || profile?.bankName || 'HDFC / ICICI Bank'}</Text>
+          <Text style={styles.assignedBankStatus}>({profile?.bankStatus || 'Processing'})</Text>
+        </View>
+      </View>
+
       <View style={styles.progressCard}>
         <Text style={styles.progressTitle}>Application Progress</Text>
         {[
@@ -648,6 +776,9 @@ const CustomerDashboardScreen = ({ navigation }) => {
           </View>
         ))}
       </View>
+
+      {/* Loan EMI Calculator */}
+      <EmiCalculatorCard />
     </ScrollView>
   );
 
@@ -775,11 +906,18 @@ const CustomerDashboardScreen = ({ navigation }) => {
         <Text style={styles.pageTitle}>{activeTab}</Text>
         <View style={styles.topBarRight}>
           <TouchableOpacity 
-            style={styles.bellBtn} 
+            style={[styles.bellBtn, { position: 'relative' }]} 
             onPress={() => navigation.navigate('Notification')}
             activeOpacity={0.7}
           >
             <Text style={styles.bellIcon}>🔔</Text>
+            {unreadNotifCount > 0 && (
+              <View style={styles.badgeWrap}>
+                <Text style={styles.badgeText}>
+                  {unreadNotifCount > 99 ? '99+' : unreadNotifCount}
+                </Text>
+              </View>
+            )}
           </TouchableOpacity>
           <View style={styles.avatarCircle}>
             <Text style={styles.avatarText}>{avatarLetter}</Text>
@@ -829,6 +967,72 @@ const styles = StyleSheet.create({
   content: { flex: 1, backgroundColor: '#F5F6FA' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
 
+  statusTrackerCard: {
+    backgroundColor: '#062B4C',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 14,
+  },
+  statusTrackerTitle: { fontSize: 15, fontWeight: '800', color: '#FFFFFF' },
+  statusTrackerSub: { fontSize: 12, color: 'rgba(255,255,255,0.75)', marginTop: 4 },
+  paymentBadge: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
+  paymentBadgeText: { fontSize: 11, fontWeight: '900' },
+  assignedBankBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 10,
+    backgroundColor: 'rgba(36, 209, 194, 0.15)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#24D1C2',
+  },
+  assignedBankLabel: { fontSize: 11, fontWeight: '700', color: '#24D1C2' },
+  assignedBankVal: { fontSize: 12, fontWeight: '900', color: '#FFFFFF' },
+  assignedBankStatus: { fontSize: 11, color: 'rgba(255,255,255,0.7)' },
+
+  // EMI Calculator Styles
+  emiCardContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    marginTop: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 6,
+  },
+  emiCardTitle: { fontSize: 16, fontWeight: '800', color: '#0F172A' },
+  emiCardSub: { fontSize: 12, color: '#64748B', marginTop: 2, marginBottom: 8 },
+  emiLabel: { fontSize: 12, fontWeight: '700', color: '#334155', marginBottom: 4 },
+  emiInput: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 13,
+    color: '#0F172A',
+  },
+  emiResultBox: {
+    flexDirection: 'row',
+    backgroundColor: '#0F172A',
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 14,
+    justifyContent: 'space-between',
+  },
+  emiResultLabel: { fontSize: 10, color: '#94A3B8', fontWeight: '600' },
+  emiResultVal: { fontSize: 14, fontWeight: '900', color: '#38BDF8', marginTop: 2 },
+  emiResultSub: { fontSize: 12, fontWeight: '700', color: '#FFFFFF', marginTop: 2 },
+
   // Top Bar
   topBar: {
     flexDirection: 'row',
@@ -850,10 +1054,37 @@ const styles = StyleSheet.create({
   pageTitle: { flex: 1, fontSize: 22, fontWeight: '800', color: '#1A1A2E', marginLeft: 8 },
   topBarRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   bellBtn: {
-    width: 38, height: 38, borderRadius: 19,
-    backgroundColor: '#F5F6FA', alignItems: 'center', justifyContent: 'center',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F5F6FA',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
   },
-  bellIcon: { fontSize: 18 },
+  bellIcon: { fontSize: 20 },
+  badgeWrap: {
+    position: 'absolute',
+    top: -3,
+    right: -3,
+    backgroundColor: '#EF4444',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+    zIndex: 10,
+    elevation: 4,
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
   avatarCircle: {
     width: 38, height: 38, borderRadius: 19,
     backgroundColor: COLORS.accent, alignItems: 'center', justifyContent: 'center',
